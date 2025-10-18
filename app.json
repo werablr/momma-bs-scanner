@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "MommaBsScanner",
+    "slug": "mommas-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nutritionscanner",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "description": "Scan barcodes to track nutrition information and organize your pantry",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mommabsscanner.app",
+      "buildNumber": "1",
+      "appleTeamId": "9VXGGDHF22",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan product barcodes for nutrition tracking.",
+        "NSPhotoLibraryUsageDescription": "This app may access your photo library to scan barcodes from images.",
+        "UIBackgroundModes": [
+          "background-processing"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "splash": {
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "android": {
+      "edgeToEdgeEnabled": true,
+      "package": "com.mommabsscanner.app",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Scanner needs camera access for barcode and expiration date scanning",
+          "enableMicrophonePermission": false
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d0a1ece4-5fa9-4c64-97e7-d3efcd577ab7"
+      },
+      "router": {}
+    },
+    "owner": "werablr"
+  }
+}
