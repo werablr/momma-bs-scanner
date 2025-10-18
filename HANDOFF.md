@@ -419,13 +419,96 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 
 ---
 
+## 🔄 Dual API Strategy for Complete Product Data (Oct 18, 2025, 4:00 PM)
+
+### The Problem: Missing Package Size Data
+
+**Issue Discovered:**
+After successful scan test with Bush's Black Beans (15 oz can, 3 servings), we found critical data missing:
+- ✅ Nutritionix provides: Nutrition facts, serving size (0.5 cup, 130g)
+- ❌ Nutritionix does NOT provide: Package size (15 oz), servings per container (3)
+
+**Why This Matters:**
+- Hundreds of different package sizes in inventory (cans, bottles, spices, etc.)
+- Need to track volume for usage alerts ("running low")
+- Can't calculate total nutrients without knowing container size
+- Important for shopping lists and reorder predictions
+
+### The Solution: Dual API Strategy
+
+**Decision:** Combine TWO data sources for complete product information
+
+**Architecture:**
+```
+Barcode Scan Flow:
+1. Call Nutritionix API → Nutrition facts (calories, fat, protein, etc.)
+2. Call UPCitemdb API → Package data (size, weight, dimensions)
+3. Merge both datasets → Complete product record
+4. Fallback: Manual entry if either API fails
+```
+
+**Why UPCitemdb?**
+- ✅ 495 million products in database
+- ✅ FREE tier: 100 requests/day (sufficient for personal use)
+- ✅ Returns: weight, size, dimensions, brand
+- ✅ RESTful JSON API (easy integration)
+- ✅ No signup required for free tier
+
+**Data Completeness:**
+- **Nutritionix:** nf_calories, nf_protein, nf_fat, serving_qty, serving_unit, serving_weight_grams
+- **UPCitemdb:** package_size, package_unit, weight, dimensions
+- **Manual/Calculated:** servings_per_container (can calculate: package_size ÷ serving_size)
+
+### Implementation Plan
+
+**Phase 1: Add Package Fields**
+- Add to schema: `package_size`, `package_unit`, `servings_per_container`
+- Add to both `inventory_items` and `inventory_history` tables
+
+**Phase 2: Integrate UPCitemdb**
+- Update `scanner-ingest` edge function to call UPCitemdb
+- Merge UPCitemdb data with Nutritionix data
+- Handle missing data gracefully (not all products in both DBs)
+
+**Phase 3: Fallback Strategy**
+- Create `product_catalog` table for user-entered data
+- First scan: Manual entry if APIs don't have data
+- Subsequent scans: Auto-populate from our catalog
+- Over time, build personalized database of common products
+
+**Phase 4: Manual Entry UI**
+- Add package size fields to review screen (optional/editable)
+- Show "We found this as 15 oz - is this correct?"
+- Allow user corrections (save to product_catalog)
+
+### API Usage Estimates
+
+**Current inventory scenario:**
+- ~300-500 unique products (hundreds of cans, bottles, spices)
+- Initial scan: 100/day (free tier) = ~5 days to scan everything
+- Ongoing: ~5-10 new products per week (well within free tier)
+
+**Conclusion:** Free tier is sufficient, no additional costs needed!
+
+### Benefits
+
+- ✅ **Complete data:** Nutrition + package info = full product profile
+- ✅ **Free:** Both APIs have sufficient free tiers
+- ✅ **Scalable:** Can upgrade UPCitemdb if needed
+- ✅ **Resilient:** Manual entry fallback for edge cases
+- ✅ **Learning:** Builds custom product catalog over time
+- ✅ **Analytics-ready:** Can calculate total nutrition per package
+
+---
+
 ## 📝 Next Steps / Future Improvements
 
-### Short-Term (Current Status - Oct 18, 3:40 PM)
+### Short-Term (Current Status - Oct 18, 4:00 PM)
 - ✅ All core features working
 - ✅ Edge function deployed with full Nutritionix data
 - ✅ **NEW:** Scalable database schema (inventory_items + inventory_history)
 - ✅ **NEW:** 40+ nutrition fields captured from Nutritionix
+- ✅ **NEW:** Dual API strategy decided (Nutritionix + UPCitemdb)
 - ✅ **NEW:** Future-ready fields for price/volume tracking
 - ✅ App icon visible
 - ✅ Error handling for invalid barcodes
@@ -433,14 +516,20 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 - ✅ Review screen displaying all data correctly
 - ✅ Category field removed
 
-### Medium-Term Enhancements (Now Possible!)
-1. **Inventory View:** Show active inventory_items in the app
-2. **Edit Items:** Allow editing/deleting inventory items
-3. **Mark as Consumed:** Use `archive_inventory_item()` to move to history
-4. **Price Tracking:** Add UI to capture price + location_purchased
-5. **Volume Tracking:** Track volume_remaining, alert when low
-6. **Household Selection:** Let users switch between households
-7. **Offline Support:** Queue scans when offline, sync when back online
+### Medium-Term Enhancements (Next Steps!)
+1. **🔥 PRIORITY: Implement UPCitemdb Integration**
+   - Add package_size, package_unit, servings_per_container fields
+   - Update edge function to call UPCitemdb API
+   - Merge package data with nutrition data
+   - Add manual entry fallback UI
+2. **Inventory View:** Show active inventory_items in the app
+3. **Edit Items:** Allow editing/deleting inventory items
+4. **Mark as Consumed:** Use `archive_inventory_item()` to move to history
+5. **Price Tracking:** Add UI to capture price + location_purchased
+6. **Volume Tracking:** Track volume_remaining, alert when low
+7. **Product Catalog:** Build reusable database of user-verified products
+8. **Household Selection:** Let users switch between households
+9. **Offline Support:** Queue scans when offline, sync when back online
 
 ### Long-Term Features (Schema Ready!)
 1. **Analytics Dashboard:**
@@ -466,6 +555,8 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 - **Supabase SQL Editor:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk/sql
 - **Edge Functions:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk/functions
 - **Nutritionix API Docs:** https://developer.nutritionix.com/
+- **UPCitemdb API Docs:** https://devs.upcitemdb.com/
+- **UPCitemdb API Explorer:** https://www.upcitemdb.com/api/explorer
 - **Google ML Kit:** https://developers.google.com/ml-kit/vision/text-recognition
 
 ---
@@ -473,31 +564,41 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 ## 💡 What Claude Should Know Next Session
 
 **Quick Start Prompt:**
-> "Read HANDOFF.md. Major architecture update completed! Database now uses scalable inventory_items + inventory_history tables with full Nutritionix data (40+ fields). Ready for price tracking, volume management, and analytics. What would you like to work on?"
+> "Read HANDOFF.md. Dual API strategy decided! Nutritionix (nutrition) + UPCitemdb (package size) = complete product data. Next priority: Implement UPCitemdb integration. What would you like to work on?"
 
 **Key Context:**
 1. ✅ **NEW DATABASE ARCHITECTURE** - inventory_items (active) + inventory_history (consumed)
 2. ✅ **Full Nutritionix capture** - 40+ fields including nutrition, photos, metadata, JSONB nutrients
-3. ✅ **Future-ready fields** - price, purchase_date, location_purchased, volume tracking
-4. ✅ **Two-step workflow functional** - Barcode scan → expiration date → review → save to inventory_items
-5. ✅ **Error handling works** - Invalid barcodes show friendly error with manual entry option
-6. ✅ **OCR is acceptable** - We know it fails on embossed metal, manual entry is the solution
-7. ✅ **Review screen is clean** - Brand, storage location display correctly. Category field removed.
-8. ✅ **All UUIDs working** - Database locations passed as props throughout the app
+3. ✅ **DUAL API STRATEGY DECIDED** - Nutritionix + UPCitemdb for complete data
+4. ❌ **MISSING DATA DISCOVERED** - Package size, servings per container NOT in Nutritionix
+5. ✅ **Future-ready fields** - price, purchase_date, location_purchased, volume tracking
+6. ✅ **Two-step workflow functional** - Barcode scan → expiration date → review → save to inventory_items
+7. ✅ **Error handling works** - Invalid barcodes show friendly error with manual entry option
+8. ✅ **OCR is acceptable** - We know it fails on embossed metal, manual entry is the solution
+9. ✅ **Review screen is clean** - Brand, storage location display correctly. Category field removed.
+10. ✅ **All UUIDs working** - Database locations passed as props throughout the app
+11. ✅ **Test successful** - Bush's Black Beans scanned and saved to inventory_items table
 
 **Important Design Decisions:**
+- **Dual API Strategy** - Combine Nutritionix (nutrition) + UPCitemdb (package) for complete data
+- **100 free requests/day** - UPCitemdb free tier sufficient for personal use (~5 days to scan entire pantry)
 - **Scalable first** - Database designed for analytics, price tracking, volume management from day 1
 - **Single source of truth** - inventory_items for active, inventory_history for consumed
+- **Fallback to manual entry** - If APIs don't have data, user can enter package info (saved to product_catalog)
 - **OCR limitations accepted** - Don't waste time on embossed text OCR. Manual entry works great.
 - **Category removed** - User decided it wasn't useful
 - **Manual entry is primary** - OCR is nice-to-have, manual entry is the reliable path
 
-**Architecture Changes (Oct 18, 3:40 PM):**
+**Architecture Changes (Oct 18, 3:40-4:00 PM):**
 - ❌ Removed: `scans`, `scan_history` tables
 - ✅ Added: `inventory_items`, `inventory_history` tables
 - ✅ Updated: Edge function to capture full Nutritionix response
 - ✅ Updated: Mobile app to use `item_id` instead of `scan_id`
 - ✅ Added: `archive_inventory_item()` helper function
+- ✅ Decided: Dual API strategy (Nutritionix + UPCitemdb)
+- 🔜 TODO: Add `package_size`, `package_unit`, `servings_per_container` fields
+- 🔜 TODO: Implement UPCitemdb API integration in edge function
+- 🔜 TODO: Create `product_catalog` table for user-verified data
 
 **Common Requests:**
 - "The app isn't working" → Check Metro bundler (`npx expo start`), check edge function logs
@@ -519,5 +620,5 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 ---
 
 **End of Handoff Document**
-**Status:** ✅ Scalable Production Architecture - Ready for Advanced Features
-**Last Updated:** October 18, 2025, 3:40 PM
+**Status:** ✅ Dual API Strategy Planned - Ready for UPCitemdb Integration
+**Last Updated:** October 18, 2025, 4:00 PM
