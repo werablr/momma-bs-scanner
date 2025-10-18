@@ -128,10 +128,10 @@ export default function BarcodeScanner({ onProductScanned }) {
       const step1Result = await scannerAPI.step1Barcode(scannedData.barcode, location.id);
 
       if (step1Result.success) {
-        console.log('✅ Step 1 complete, scan ID:', step1Result.scan_id);
+        console.log('✅ Step 1 complete, item ID:', step1Result.item_id);
         console.log('📦 Product:', step1Result.product);
 
-        setCurrentScanId(step1Result.scan_id);
+        setCurrentScanId(step1Result.item_id);
         setWorkflowStep(2);
 
         // Store product data from step 1
@@ -274,7 +274,7 @@ export default function BarcodeScanner({ onProductScanned }) {
 
     try {
       const result = await scannerAPI.flagForReview(
-        scannedData.scanId,
+        currentScanId,
         flagData
       );
 

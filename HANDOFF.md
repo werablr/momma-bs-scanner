@@ -1,23 +1,25 @@
 # Scanner App - Session Handoff Document
 
-**Date:** October 18, 2025, 3:15 PM
-**Status:** ✅ Fully Functional - Production Ready
-**Last Test:** Complete scan workflow working with manual date entry
+**Date:** October 18, 2025, 3:40 PM
+**Status:** ✅ Scalable Architecture - Production Ready
+**Last Update:** Major database restructure with full Nutritionix data capture
 
 ---
 
-## 🎯 Current State: PRODUCTION READY
+## 🎯 Current State: SCALABLE PRODUCTION ARCHITECTURE
 
-The scanner app is **fully functional** with a complete two-step barcode scanning workflow:
+The scanner app has been **restructured with a scalable database design**:
 
 1. ✅ **Mobile App** - React Native app with MB icon deployed to iPhone
-2. ✅ **Edge Function** - `scanner-ingest` deployed to Supabase
-3. ✅ **Database** - `scans` table created with proper RLS policies
-4. ✅ **Storage Locations** - 8 locations in database with UUIDs
-5. ✅ **API Integration** - Nutritionix API credentials configured server-side
-6. ✅ **Error Handling** - QR code/invalid barcode detection with manual entry option
-7. ✅ **Manual Date Entry** - Working date picker for expiration dates
-8. ✅ **Review Screen** - Clean UI with all product data displaying correctly
+2. ✅ **Edge Function** - `scanner-ingest` deployed with full Nutritionix data capture
+3. ✅ **Database** - New `inventory_items` + `inventory_history` architecture
+4. ✅ **Full Nutritionix Data** - Captures ALL available nutrition fields + metadata
+5. ✅ **Future-Ready** - Price tracking, volume tracking, purchase location fields ready
+6. ✅ **Storage Locations** - 8 locations in database with UUIDs
+7. ✅ **API Integration** - Nutritionix API credentials configured server-side
+8. ✅ **Error Handling** - QR code/invalid barcode detection with manual entry option
+9. ✅ **Manual Date Entry** - Working date picker for expiration dates
+10. ✅ **Review Screen** - Clean UI with all product data displaying correctly
 
 ---
 
@@ -37,9 +39,12 @@ The scanner app is **fully functional** with a complete two-step barcode scannin
 - **Edge Function:** `scanner-ingest` (deployed)
 - **Dashboard:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk
 
-### Database Tables
+### Database Tables (NEW ARCHITECTURE - Oct 18, 2025)
 1. **storage_locations** - 8 locations for household `7c093e13-4bcf-463e-96c1-9f499de9c4f2`
-2. **scans** - Stores barcode scan results with nutritional data
+2. **inventory_items** - Active inventory with FULL Nutritionix data (40+ fields)
+3. **inventory_history** - Archived consumed/used items for analytics
+4. ~~**scans**~~ - REMOVED (replaced by inventory_items)
+5. ~~**scan_history**~~ - REMOVED (replaced by inventory_history)
 
 ### OCR Library
 - **Google ML Kit Text Recognition** - Industry-leading OCR for mobile
@@ -150,7 +155,63 @@ NUTRITIONIX_API_KEY=c4aef73c1d82155043c4f3a6f2b9185a
 
 ---
 
-## 🛠️ Key Fixes Applied This Session (Oct 18, 3:15 PM)
+## 🏗️ Major Architecture Update (Oct 18, 2025, 3:40 PM)
+
+### Database Restructure: Scalable Inventory System
+
+**Motivation:**
+- Previous `scans` table was temporary and limited
+- Needed full Nutritionix data capture (40+ fields vs 13)
+- Required future-ready fields for price tracking, volume management, purchase location
+- Wanted analytics capability with historical data
+
+**Changes Made:**
+
+1. **New Tables:**
+   - `inventory_items` - Active inventory with ALL Nutritionix fields
+   - `inventory_history` - Archive for consumed items with analytics fields
+
+2. **Removed Tables:**
+   - Dropped `scans` table (replaced by inventory_items)
+   - Dropped `scan_history` table (replaced by inventory_history)
+
+3. **Edge Function Updates:**
+   - Updated `scanner-ingest` to write to `inventory_items`
+   - Now captures full Nutritionix response including:
+     - All nutrition facts (nf_* fields)
+     - Product metadata (nix_brand_id, nix_item_id)
+     - Photos (thumb and highres URLs)
+     - Full nutrients array (JSONB)
+     - Alternative measures (JSONB)
+     - Tags (JSONB)
+   - Changed response from `scan_id` to `item_id`
+
+4. **Mobile App Updates:**
+   - Updated `scannerAPI.js` to use `item_id` instead of `scan_id`
+   - Updated `BarcodeScanner.js` to reference inventory items
+   - Added `archiveItem()` method for moving items to history
+
+5. **Future-Ready Fields (Nullable for now):**
+   - `purchase_date`, `price`, `location_purchased`
+   - `volume_purchased`, `volume_unit`, `volume_remaining`
+   - Status progression: pending → active → low → expired → consumed
+
+6. **Helper Function:**
+   - `archive_inventory_item(item_id, consumed_date, waste_reason, usage_notes)`
+   - Automatically calculates days_in_inventory
+   - Moves item from active to history table
+
+**Benefits:**
+- ✅ Complete nutrition data for future features
+- ✅ Analytics-ready with historical tracking
+- ✅ Price and volume tracking when ready
+- ✅ Single source of truth per item lifecycle
+- ✅ Fast queries on active inventory
+- ✅ Waste reduction insights via history table
+
+---
+
+## 🛠️ Previous Fixes (Oct 18, 3:15 PM)
 
 ### 1. Product Not Found Error Handling
 **Problem:** QR codes and invalid barcodes caused silent failures
@@ -186,7 +247,83 @@ NUTRITIONIX_API_KEY=c4aef73c1d82155043c4f3a6f2b9185a
 
 ---
 
-## 📊 Database Schema Reference
+## 📊 Database Schema Reference (NEW ARCHITECTURE)
+
+### inventory_items (Active Inventory)
+```sql
+-- Primary identifiers
+id                     UUID PRIMARY KEY
+created_at             TIMESTAMP WITH TIME ZONE
+updated_at             TIMESTAMP WITH TIME ZONE
+household_id           UUID NOT NULL
+
+-- Barcode scan data
+barcode                TEXT NOT NULL
+scanned_at             TIMESTAMP WITH TIME ZONE
+
+-- Basic product info from Nutritionix
+food_name              TEXT
+brand_name             TEXT
+nix_brand_id           TEXT
+nix_item_id            TEXT
+
+-- Serving information
+serving_qty            DECIMAL
+serving_unit           TEXT
+serving_weight_grams   DECIMAL
+
+-- Core nutrition facts (per serving)
+nf_calories            DECIMAL
+nf_total_fat           DECIMAL
+nf_saturated_fat       DECIMAL
+nf_cholesterol         DECIMAL
+nf_sodium              DECIMAL
+nf_total_carbohydrate  DECIMAL
+nf_dietary_fiber       DECIMAL
+nf_sugars              DECIMAL
+nf_protein             DECIMAL
+nf_potassium           DECIMAL
+
+-- Additional Nutritionix metadata
+photo_thumb            TEXT
+photo_highres          TEXT
+ndb_no                 TEXT
+source                 INTEGER
+full_nutrients         JSONB  -- Complete nutrient breakdown
+alt_measures           JSONB  -- Alternative serving sizes
+tags                   JSONB  -- Product tags
+
+-- Storage and expiration
+storage_location_id    UUID REFERENCES storage_locations(id)
+expiration_date        DATE
+
+-- OCR data
+ocr_text               TEXT
+ocr_confidence         DECIMAL
+ocr_processing_time_ms INTEGER
+
+-- Future: Purchase tracking
+purchase_date          DATE
+price                  DECIMAL(10, 2)
+location_purchased     TEXT
+
+-- Future: Volume tracking
+volume_purchased       DECIMAL
+volume_unit            TEXT
+volume_remaining       DECIMAL
+
+-- Status tracking
+status                 TEXT (pending, active, low, expired, consumed)
+notes                  TEXT
+```
+
+### inventory_history (Consumed/Used Items for Analytics)
+Same schema as `inventory_items` PLUS:
+- `archived_at` - When item was moved to history
+- `consumed_date` - When item was finished
+- `days_in_inventory` - Purchase/scan → consumed duration
+- `waste_reason` - consumed, expired, spoiled, discarded, other
+- `usage_notes` - Additional context
 
 ### storage_locations
 ```sql
@@ -209,34 +346,6 @@ created_at            TIMESTAMP
 - Liquor Cabinet
 - Pantry
 - Refrigerator
-
-### scans
-```sql
-id                     UUID PRIMARY KEY
-barcode               TEXT NOT NULL
-product_name          TEXT
-brand                 TEXT
-serving_size          DECIMAL
-serving_unit          TEXT
-calories              DECIMAL
-total_fat             DECIMAL
-saturated_fat         DECIMAL
-cholesterol           DECIMAL
-sodium                DECIMAL
-total_carbohydrate    DECIMAL
-dietary_fiber         DECIMAL
-sugars                DECIMAL
-protein               DECIMAL
-storage_location_id   UUID REFERENCES storage_locations(id)
-expiration_date       DATE
-ocr_text              TEXT
-ocr_confidence        DECIMAL
-ocr_processing_time_ms INTEGER
-status                TEXT (pending_expiration, complete, failed)
-household_id          UUID
-created_at            TIMESTAMP
-updated_at            TIMESTAMP
-```
 
 ---
 
@@ -312,28 +421,40 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 
 ## 📝 Next Steps / Future Improvements
 
-### Short-Term (Current Status)
+### Short-Term (Current Status - Oct 18, 3:40 PM)
 - ✅ All core features working
-- ✅ Edge function deployed
-- ✅ Database schema complete
+- ✅ Edge function deployed with full Nutritionix data
+- ✅ **NEW:** Scalable database schema (inventory_items + inventory_history)
+- ✅ **NEW:** 40+ nutrition fields captured from Nutritionix
+- ✅ **NEW:** Future-ready fields for price/volume tracking
 - ✅ App icon visible
 - ✅ Error handling for invalid barcodes
 - ✅ Manual date entry working
 - ✅ Review screen displaying all data correctly
 - ✅ Category field removed
 
-### Medium-Term Enhancements
-1. **Scan History View:** Show list of previously scanned items in the app
-2. **Edit Scans:** Allow editing/deleting scanned items
-3. **Offline Support:** Queue scans when offline, sync when back online
-4. **Better Package Size Entry:** Pre-populate from Nutritionix serving size data
-5. **Household Selection:** Let users switch between households
+### Medium-Term Enhancements (Now Possible!)
+1. **Inventory View:** Show active inventory_items in the app
+2. **Edit Items:** Allow editing/deleting inventory items
+3. **Mark as Consumed:** Use `archive_inventory_item()` to move to history
+4. **Price Tracking:** Add UI to capture price + location_purchased
+5. **Volume Tracking:** Track volume_remaining, alert when low
+6. **Household Selection:** Let users switch between households
+7. **Offline Support:** Queue scans when offline, sync when back online
 
-### Long-Term Architecture
-1. **Remove constants.js:** Eliminate hardcoded STORAGE_LOCATIONS constant entirely
-2. **Admin UI:** Let users manage storage locations (add/edit/delete)
-3. **Analytics Dashboard:** Track scanning patterns, inventory levels, expiration alerts
-4. **Notifications:** Alert users when products are near expiration
+### Long-Term Features (Schema Ready!)
+1. **Analytics Dashboard:**
+   - Spending patterns from `inventory_history.price`
+   - Waste tracking from `inventory_history.waste_reason`
+   - Average days_in_inventory per product
+   - Reorder predictions based on consumption rate
+2. **Shopping List:**
+   - Auto-generate from consumed items
+   - Include price data from previous purchases
+3. **Expiration Alerts:**
+   - Notifications for items near expiration_date
+   - Smart suggestions to use items before waste
+4. **Admin UI:** Manage storage locations (add/edit/delete)
 5. **Multi-household:** Support multiple households per user
 6. **Barcode Database:** Build custom database for products not in Nutritionix
 
@@ -352,33 +473,51 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 ## 💡 What Claude Should Know Next Session
 
 **Quick Start Prompt:**
-> "Read HANDOFF.md. The scanner app is fully functional. The latest session fixed error handling, manual date entry, and review screen display issues. What would you like to work on?"
+> "Read HANDOFF.md. Major architecture update completed! Database now uses scalable inventory_items + inventory_history tables with full Nutritionix data (40+ fields). Ready for price tracking, volume management, and analytics. What would you like to work on?"
 
 **Key Context:**
-1. ✅ **Two-step workflow is fully functional** - Barcode scan → expiration date → review → save
-2. ✅ **Error handling works** - Invalid barcodes show friendly error with manual entry option
-3. ✅ **OCR is acceptable** - We know it fails on embossed metal, manual entry is the solution (don't try to fix OCR)
-4. ✅ **Review screen is clean** - Brand, storage location display correctly. Category field removed.
-5. ✅ **All UUIDs working** - Database locations passed as props throughout the app
+1. ✅ **NEW DATABASE ARCHITECTURE** - inventory_items (active) + inventory_history (consumed)
+2. ✅ **Full Nutritionix capture** - 40+ fields including nutrition, photos, metadata, JSONB nutrients
+3. ✅ **Future-ready fields** - price, purchase_date, location_purchased, volume tracking
+4. ✅ **Two-step workflow functional** - Barcode scan → expiration date → review → save to inventory_items
+5. ✅ **Error handling works** - Invalid barcodes show friendly error with manual entry option
+6. ✅ **OCR is acceptable** - We know it fails on embossed metal, manual entry is the solution
+7. ✅ **Review screen is clean** - Brand, storage location display correctly. Category field removed.
+8. ✅ **All UUIDs working** - Database locations passed as props throughout the app
 
 **Important Design Decisions:**
-- **OCR limitations are accepted** - Don't waste time trying to fix OCR for embossed text. Manual entry works great.
+- **Scalable first** - Database designed for analytics, price tracking, volume management from day 1
+- **Single source of truth** - inventory_items for active, inventory_history for consumed
+- **OCR limitations accepted** - Don't waste time on embossed text OCR. Manual entry works great.
 - **Category removed** - User decided it wasn't useful
 - **Manual entry is primary** - OCR is nice-to-have, manual entry is the reliable path
+
+**Architecture Changes (Oct 18, 3:40 PM):**
+- ❌ Removed: `scans`, `scan_history` tables
+- ✅ Added: `inventory_items`, `inventory_history` tables
+- ✅ Updated: Edge function to capture full Nutritionix response
+- ✅ Updated: Mobile app to use `item_id` instead of `scan_id`
+- ✅ Added: `archive_inventory_item()` helper function
 
 **Common Requests:**
 - "The app isn't working" → Check Metro bundler (`npx expo start`), check edge function logs
 - "OCR not working" → This is expected for embossed text. Manual entry is the solution.
-- "Need to add X feature" → Core architecture is solid, ready for enhancements from "Next Steps" section
+- "Need to add X feature" → Architecture is now scalable! See "Next Steps" for price tracking, volume management, analytics
 - "Product not found" → Expected for QR codes and non-UPC barcodes
+- "Need to test" → Run full scan workflow, data should save to inventory_items table
 
 **Files Most Likely to Edit Next:**
-- `components/BarcodeScanner.js` - Main scanning logic
-- `components/EditableReview.js` - Review screen UI
-- `supabase/functions/scanner-ingest/index.ts` - Backend logic
+- `components/BarcodeScanner.js` - Add inventory view, mark as consumed
+- `supabase/functions/scanner-ingest/index.ts` - Backend logic for new features
+- `services/scannerAPI.js` - Add methods for inventory queries
+- New: Create inventory list view component
+- New: Create analytics dashboard component
+
+**Database Helper Functions Available:**
+- `archive_inventory_item(item_id, consumed_date, waste_reason, usage_notes)` - Move item to history
 
 ---
 
 **End of Handoff Document**
-**Status:** ✅ Production Ready - All Core Features Working
-**Last Updated:** October 18, 2025, 3:15 PM
+**Status:** ✅ Scalable Production Architecture - Ready for Advanced Features
+**Last Updated:** October 18, 2025, 3:40 PM

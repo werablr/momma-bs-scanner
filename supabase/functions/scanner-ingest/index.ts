@@ -86,41 +86,62 @@ serve(async (req) => {
           )
         }
 
-        // Create scan record in database
-        const { data: scanRecord, error: scanError } = await supabaseClient
-          .from('scans')
+        // Create inventory item record in database with full Nutritionix data
+        const { data: inventoryItem, error: inventoryError } = await supabaseClient
+          .from('inventory_items')
           .insert({
             barcode: barcode,
             storage_location_id: storage_location_id,
-            product_name: product.food_name,
-            brand: product.brand_name,
-            serving_size: product.serving_qty,
+            household_id: '7c093e13-4bcf-463e-96c1-9f499de9c4f2', // TODO: Get from user context
+
+            // Basic product info
+            food_name: product.food_name,
+            brand_name: product.brand_name,
+            nix_brand_id: product.nix_brand_id,
+            nix_item_id: product.nix_item_id,
+
+            // Serving information
+            serving_qty: product.serving_qty,
             serving_unit: product.serving_unit,
-            calories: product.nf_calories,
-            total_fat: product.nf_total_fat,
-            saturated_fat: product.nf_saturated_fat,
-            cholesterol: product.nf_cholesterol,
-            sodium: product.nf_sodium,
-            total_carbohydrate: product.nf_total_carbohydrate,
-            dietary_fiber: product.nf_dietary_fiber,
-            sugars: product.nf_sugars,
-            protein: product.nf_protein,
-            status: 'pending_expiration', // Waiting for step 2
+            serving_weight_grams: product.serving_weight_grams,
+
+            // Nutrition facts
+            nf_calories: product.nf_calories,
+            nf_total_fat: product.nf_total_fat,
+            nf_saturated_fat: product.nf_saturated_fat,
+            nf_cholesterol: product.nf_cholesterol,
+            nf_sodium: product.nf_sodium,
+            nf_total_carbohydrate: product.nf_total_carbohydrate,
+            nf_dietary_fiber: product.nf_dietary_fiber,
+            nf_sugars: product.nf_sugars,
+            nf_protein: product.nf_protein,
+            nf_potassium: product.nf_potassium,
+
+            // Additional metadata
+            photo_thumb: product.photo?.thumb,
+            photo_highres: product.photo?.highres,
+            ndb_no: product.ndb_no,
+            source: product.source,
+            full_nutrients: product.full_nutrients,
+            alt_measures: product.alt_measures,
+            tags: product.tags,
+
+            status: 'pending', // Waiting for step 2 (expiration date)
           })
           .select()
           .single()
 
-        if (scanError) {
-          console.error('Database error:', scanError)
-          throw scanError
+        if (inventoryError) {
+          console.error('Database error:', inventoryError)
+          throw inventoryError
         }
 
-        console.log('Step 1 complete, scan_id:', scanRecord.id)
+        console.log('Step 1 complete, inventory_item_id:', inventoryItem.id)
 
         return new Response(
           JSON.stringify({
             success: true,
-            scan_id: scanRecord.id,
+            item_id: inventoryItem.id,
             product: {
               name: product.food_name,
               brand: product.brand_name,
@@ -143,17 +164,17 @@ serve(async (req) => {
 
       // STEP 2: Expiration date capture
       if (step === 2) {
-        console.log('Step 2: Processing expiration for scan_id:', scan_id)
+        console.log('Step 2: Processing expiration for item_id:', scan_id)
 
-        // Update scan record with expiration date
-        const { data: updatedScan, error: updateError } = await supabaseClient
-          .from('scans')
+        // Update inventory item with expiration date and mark as active
+        const { data: updatedItem, error: updateError } = await supabaseClient
+          .from('inventory_items')
           .update({
             expiration_date: extracted_date,
             ocr_text: ocr_text,
             ocr_confidence: confidence,
             ocr_processing_time_ms: processing_time_ms,
-            status: 'complete',
+            status: 'active',
           })
           .eq('id', scan_id)
           .select()
@@ -169,7 +190,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             success: true,
-            scan: updatedScan,
+            item: updatedItem,
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

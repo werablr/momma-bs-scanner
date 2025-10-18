@@ -116,25 +116,27 @@ class ScannerAPI {
     }
   }
 
-  // Save scan to history
-  async saveScanHistory(scanData) {
+  // Archive item to history (when consumed/used)
+  async archiveItem(itemId, consumedDate, wasteReason = 'consumed', usageNotes = null) {
     try {
-      console.log('📝 Saving scan to history:', scanData);
+      console.log('📝 Archiving item to history:', { itemId, consumedDate, wasteReason });
 
-      const { data, error } = await supabase
-        .from('scan_history')
-        .insert([scanData])
-        .select();
+      const { data, error } = await supabase.rpc('archive_inventory_item', {
+        item_id: itemId,
+        p_consumed_date: consumedDate,
+        p_waste_reason: wasteReason,
+        p_usage_notes: usageNotes
+      });
 
       if (error) {
-        console.error('❌ Failed to save scan history:', error);
+        console.error('❌ Failed to archive item:', error);
         throw error;
       }
 
-      console.log('✅ Scan history saved:', data);
-      return data[0];
+      console.log('✅ Item archived to history');
+      return { success: true };
     } catch (error) {
-      console.error('❌ Save scan history failed:', error);
+      console.error('❌ Archive item failed:', error);
       throw error;
     }
   }
@@ -229,7 +231,7 @@ class ScannerAPI {
       console.log('✅ Step 1 success:', response.data);
       return {
         success: true,
-        scan_id: response.data.scan_id,
+        item_id: response.data.item_id,
         product: response.data.product,
         suggested_category: response.data.suggested_category,
         confidence_score: response.data.confidence_score
@@ -246,10 +248,10 @@ class ScannerAPI {
   }
 
   // Step 2: Submit expiration date via OCR
-  async step2Expiration(scanId, ocrText, extractedDate, confidence, processingTimeMs) {
+  async step2Expiration(itemId, ocrText, extractedDate, confidence, processingTimeMs) {
     try {
       console.log('📝 Step 2: Submitting expiration data:', {
-        scanId,
+        itemId,
         ocrText,
         extractedDate,
         confidence,
@@ -260,7 +262,7 @@ class ScannerAPI {
         body: {
           workflow: 'two-step',
           step: 2,
-          scan_id: scanId,
+          scan_id: itemId, // NOTE: Backend still uses scan_id param name for backward compat
           ocr_text: ocrText,
           extracted_date: extractedDate,
           ocr_confidence: confidence,
@@ -312,28 +314,28 @@ class ScannerAPI {
     }
   }
 
-  // Get pending step 2 scans (scans that completed step 1 but not step 2)
+  // Get pending step 2 items (items that completed step 1 but not step 2)
   async getPendingStep2() {
     try {
-      console.log('📋 Fetching pending step 2 scans');
+      console.log('📋 Fetching pending step 2 items');
 
       const { data, error } = await supabase
-        .from('scans')
+        .from('inventory_items')
         .select('*')
-        .eq('workflow_step', 1)
+        .eq('status', 'pending')
         .is('expiration_date', null)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Failed to fetch pending scans:', error);
+        console.error('❌ Failed to fetch pending items:', error);
         throw error;
       }
 
-      console.log('✅ Pending scans fetched:', data);
-      return { success: true, scans: data };
+      console.log('✅ Pending items fetched:', data);
+      return { success: true, items: data };
     } catch (error) {
-      console.error('❌ Get pending scans exception:', error);
-      return { success: false, error: error.message, scans: [] };
+      console.error('❌ Get pending items exception:', error);
+      return { success: false, error: error.message, items: [] };
     }
   }
 
