@@ -12,21 +12,45 @@ import { STORAGE_LOCATIONS, DEFAULT_STORAGE_BY_CATEGORY } from '../utils/constan
 
 const { width } = Dimensions.get('window');
 
-export default function StorageLocationPicker({ 
-  visible, 
-  onClose, 
-  onSelect, 
+export default function StorageLocationPicker({
+  visible,
+  onClose,
+  onSelect,
   suggestedCategory,
-  productName 
+  productName,
+  storageLocations = []
 }) {
+  // Use database locations if available, otherwise fall back to constants
+  const locations = storageLocations.length > 0 ? storageLocations : STORAGE_LOCATIONS;
+
   const getDefaultLocation = () => {
+    // For database locations, find by type instead of ID
+    if (storageLocations.length > 0) {
+      const pantry = storageLocations.find(loc => loc.type === 'pantry');
+      return pantry?.id;
+    }
+
     if (suggestedCategory && DEFAULT_STORAGE_BY_CATEGORY[suggestedCategory]) {
       return DEFAULT_STORAGE_BY_CATEGORY[suggestedCategory];
     }
-    return 3; // Default to Pantry
+    return 3; // Default to Pantry (for old constant-based locations)
   };
 
   const defaultLocationId = getDefaultLocation();
+
+  // Icon mapping for database locations
+  const getIcon = (location) => {
+    if (location.icon) return location.icon;
+
+    // Map type to icon
+    const iconMap = {
+      'pantry': '🏪',
+      'fridge': '❄️',
+      'freezer': '🧊',
+      'counter': '🍞',
+    };
+    return iconMap[location.type] || '📦';
+  };
 
   return (
     <Modal
@@ -50,7 +74,7 @@ export default function StorageLocationPicker({
           </View>
 
           <ScrollView style={styles.locationsList}>
-            {STORAGE_LOCATIONS.map((location) => {
+            {locations.map((location) => {
               const isDefault = location.id === defaultLocationId;
               return (
                 <TouchableOpacity
@@ -61,7 +85,7 @@ export default function StorageLocationPicker({
                   ]}
                   onPress={() => onSelect(location)}
                 >
-                  <Text style={styles.locationIcon}>{location.icon}</Text>
+                  <Text style={styles.locationIcon}>{getIcon(location)}</Text>
                   <View style={styles.locationTextContainer}>
                     <Text style={styles.locationName}>{location.name}</Text>
                     {isDefault && (

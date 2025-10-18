@@ -1,0 +1,20 @@
+# Supabase configuration file
+project_id = "bwglyyfcdjzvvjdxxjmk"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+# Edge Functions configuration will be managed via dashboard

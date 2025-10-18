@@ -236,7 +236,7 @@ export default function BarcodeScanner({ onProductScanned }) {
       // Two-step workflow - data already saved, just approve
       const result = { success: true, corrections_submitted: !!corrections };
 
-      const selectedLocation = STORAGE_LOCATIONS.find(loc => loc.id === selectedStorage);
+      const selectedLocation = storageLocations.find(loc => loc.id === selectedStorage);
       const hasCorrections = result.corrections_submitted;
       
       Alert.alert(
@@ -556,6 +556,7 @@ export default function BarcodeScanner({ onProductScanned }) {
         onSelect={handleStorageLocationSelected}
         suggestedCategory={productData?.suggested_category}
         productName={productData?.name}
+        storageLocations={storageLocations}
       />
 
       <ExpirationDateCapture

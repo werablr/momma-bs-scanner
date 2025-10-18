@@ -194,7 +194,7 @@ class ScannerAPI {
     try {
       console.log('📝 Step 1: Submitting barcode:', { barcode, storageLocationId });
 
-      const { data, error } = await supabase.functions.invoke('scanner-ingest', {
+      const response = await supabase.functions.invoke('scanner-ingest', {
         body: {
           workflow: 'two-step',
           step: 1,
@@ -203,21 +203,34 @@ class ScannerAPI {
         }
       });
 
-      if (error) {
-        console.error('❌ Step 1 failed:', error);
-        return { success: false, error: error.message || 'Step 1 failed' };
+      console.log('🔍 RAW RESPONSE:', JSON.stringify(response, null, 2));
+
+      if (response.error) {
+        console.error('❌ Step 1 failed:', response.error);
+        console.error('❌ Error details:', {
+          message: response.error.message,
+          status: response.error.status,
+          statusText: response.error.statusText,
+          context: response.error.context
+        });
+        return { success: false, error: response.error.message || 'Step 1 failed' };
       }
 
-      console.log('✅ Step 1 success:', data);
+      console.log('✅ Step 1 success:', response.data);
       return {
         success: true,
-        scan_id: data.scan_id,
-        product: data.product,
-        suggested_category: data.suggested_category,
-        confidence_score: data.confidence_score
+        scan_id: response.data.scan_id,
+        product: response.data.product,
+        suggested_category: response.data.suggested_category,
+        confidence_score: response.data.confidence_score
       };
     } catch (error) {
       console.error('❌ Step 1 exception:', error);
+      console.error('❌ Exception details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return { success: false, error: error.message || 'Step 1 failed' };
     }
   }

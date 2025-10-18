@@ -56,24 +56,5 @@ target 'MommaBsScanner' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        # Fix deployment target warnings - set minimum to 12.0
-        deployment_target = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
-        if deployment_target && deployment_target.to_f < 12.0
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-        end
-
-        # Suppress warnings we cannot fix (in third-party code)
-        config.build_settings['WARNING_CFLAGS'] ||= ['$(inherited)']
-        config.build_settings['WARNING_CFLAGS'] << '-Wno-nullability-completeness'
-        config.build_settings['WARNING_CFLAGS'] << '-Wno-deprecated-declarations'
-
-        # For Swift targets, suppress deprecation warnings
-        config.build_settings['OTHER_SWIFT_FLAGS'] ||= ['$(inherited)']
-        config.build_settings['OTHER_SWIFT_FLAGS'] << '-suppress-warnings'
-      end
-    end
   end
 end

@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "MommaBsScanner",
+    "name": "Momma B's Scanner",
     "slug": "mommas-scanner",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "nutritionscanner",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/images/icon.png",
     "description": "Scan barcodes to track nutrition information and organize your pantry",
     "platforms": [
       "ios",
