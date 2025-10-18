@@ -1,8 +1,8 @@
 # Scanner App - Session Handoff Document
 
-**Date:** October 18, 2025
-**Status:** ✅ Fully Functional - Edge Function Deployed
-**Last Test:** Barcode scanning working, OCR expiration capture working
+**Date:** October 18, 2025, 3:15 PM
+**Status:** ✅ Fully Functional - Production Ready
+**Last Test:** Complete scan workflow working with manual date entry
 
 ---
 
@@ -15,6 +15,9 @@ The scanner app is **fully functional** with a complete two-step barcode scannin
 3. ✅ **Database** - `scans` table created with proper RLS policies
 4. ✅ **Storage Locations** - 8 locations in database with UUIDs
 5. ✅ **API Integration** - Nutritionix API credentials configured server-side
+6. ✅ **Error Handling** - QR code/invalid barcode detection with manual entry option
+7. ✅ **Manual Date Entry** - Working date picker for expiration dates
+8. ✅ **Review Screen** - Clean UI with all product data displaying correctly
 
 ---
 
@@ -38,6 +41,11 @@ The scanner app is **fully functional** with a complete two-step barcode scannin
 1. **storage_locations** - 8 locations for household `7c093e13-4bcf-463e-96c1-9f499de9c4f2`
 2. **scans** - Stores barcode scan results with nutritional data
 
+### OCR Library
+- **Google ML Kit Text Recognition** - Industry-leading OCR for mobile
+- **Note:** OCR struggles with embossed/stamped text on curved metal surfaces (this is expected)
+- **Solution:** Manual date entry via date picker is working well
+
 ---
 
 ## 📱 How The Scanner Works
@@ -59,28 +67,31 @@ The scanner app is **fully functional** with a complete two-step barcode scannin
    ```
 5. Edge function:
    - Calls Nutritionix API to lookup product
-   - Creates record in `scans` table
+   - Creates record in `scans` table with status "pending_expiration"
    - Returns product data to app
-6. App advances to Step 2
+6. **Error Handling:** If product not found (QR codes, non-UPC barcodes), user sees clear error with option for manual entry
+7. App advances to Step 2
 
-**Step 2: Expiration Date (OCR)**
+**Step 2: Expiration Date (OCR + Manual)**
 1. Camera activates for OCR text recognition
-2. ML Kit scans expiration date on product
-3. App extracts date from OCR text
-4. App calls `scanner-ingest` edge function with:
+2. ML Kit attempts to scan expiration date on product
+3. If OCR fails (common with embossed text), user sees "No Date Found" dialog
+4. User taps "Enter Manually" to use date picker
+5. App calls `scanner-ingest` edge function with:
    ```json
    {
      "workflow": "two-step",
      "step": 2,
      "scan_id": "<uuid>",
-     "ocr_text": "Best By 12/31/2025",
-     "extracted_date": "2025-12-31",
-     "confidence": 0.95,
-     "processing_time_ms": 172
+     "ocr_text": "",
+     "extracted_date": "2025-10-18",
+     "confidence": 0,
+     "processing_time_ms": 0
    }
    ```
-5. Edge function updates scan record with expiration data
-6. Workflow complete
+6. Edge function updates scan record with expiration data and status "complete"
+7. User reviews product data on EditableReview screen
+8. User taps "Approve with Edits" to finalize
 
 ---
 
@@ -97,19 +108,21 @@ scanner/
 │   └── config.toml
 │
 ├── components/                    # React Native components
-│   ├── BarcodeScanner.js          # Main scanner component (FIXED - uses UUIDs)
-│   └── StorageLocationPicker.js   # Location picker (FIXED - accepts database locations)
+│   ├── BarcodeScanner.js          # Main scanner (uses database UUIDs, passes storageLocations)
+│   ├── StorageLocationPicker.js   # Location picker (accepts database locations prop)
+│   ├── EditableReview.js          # Review screen (FIXED: brand display, storage location display, category removed)
+│   └── ExpirationDateCapture.js   # OCR + manual date entry modal
 │
 ├── services/                      # API layer
-│   ├── scannerAPI.js              # Scanner API (HAS step1Barcode, step2Expiration methods)
+│   ├── scannerAPI.js              # Scanner API (FIXED: handles success:false from edge function)
+│   ├── ocrService.js              # OCR wrapper with ML Kit
 │   └── nutritionix.js             # Nutritionix integration
+│
+├── utils/
+│   └── datePatternRecognition.js  # Date extraction patterns (simplified, no workarounds)
 │
 ├── lib/
 │   └── supabase.js                # Supabase client
-│
-├── docs/                          # Documentation
-│   ├── deployment.md              # Deployment guide
-│   └── POAM-Scanner-Deployment.md # Reference docs
 │
 ├── .env                           # Environment variables
 ├── app.json                       # Expo config (has icon path)
@@ -137,37 +150,39 @@ NUTRITIONIX_API_KEY=c4aef73c1d82155043c4f3a6f2b9185a
 
 ---
 
-## 🛠️ Key Fixes Applied This Session
+## 🛠️ Key Fixes Applied This Session (Oct 18, 3:15 PM)
 
-### 1. Storage Location UUID Migration
-**Problem:** App used hardcoded integer IDs (1, 2, 3...), database uses UUIDs
+### 1. Product Not Found Error Handling
+**Problem:** QR codes and invalid barcodes caused silent failures
 **Solution:**
-- Updated `BarcodeScanner.js` to use database UUIDs
-- Updated `StorageLocationPicker.js` to accept `storageLocations` prop
-- Pass database locations from BarcodeScanner to picker
+- Updated `scannerAPI.js` to check for `response.data.success === false`
+- Updated `BarcodeScanner.js` to show user-friendly error dialog
+- Added option to redirect to manual entry or retry scan
 
-### 2. Edge Function Creation
-**Problem:** `scanner-ingest` function didn't exist (404 errors)
+### 2. OCR Date Recognition Issues
+**Problem:** OCR couldn't read embossed dates on curved metal (e.g., "BEST BY JUN 2027" read as "BEST BY UN2027")
+**Analysis:** This is a computer vision limitation - ML Kit is optimized for flat printed text, not embossed metal
 **Solution:**
-- Created `/supabase/functions/scanner-ingest/index.ts`
-- Implemented two-step workflow (barcode lookup + expiration update)
-- Integrated Nutritionix API server-side
-- Deployed with `supabase functions deploy scanner-ingest`
+- Removed ineffective OCR correction workarounds
+- Kept OCR simple and reliable
+- Manual date entry works perfectly as fallback
+- Added detailed logging to help debug OCR issues
 
-### 3. Database Schema
-**Problem:** `scans` table didn't exist
+### 3. EditableReview Display Issues
+**Problem:** Brand showed empty, storage location showed "undefined Pantry"
 **Solution:**
-- Created migration: `supabase/migrations/20251018_create_scans_table.sql`
-- Added RLS policies for anonymous access
-- Executed via Supabase Dashboard SQL Editor
+- Fixed brand field to check both `productData.brand` and `productData.brand_name`
+- Passed `storageLocations` prop from BarcodeScanner to EditableReview
+- Removed icon display (database locations don't have icon field)
+- Now shows just location name: "Pantry"
 
-### 4. App Icon
-**Problem:** Blank white icon, couldn't identify app
+### 4. Category Field Removal
+**Problem:** Category dropdown wasn't useful
 **Solution:**
-- Generated icon with "MB" text using Python/PIL
-- Saved to `assets/images/icon.png`
-- Updated `app.json` with icon path
-- Rebuilt app with new icon
+- Completely removed CategoryPicker component
+- Removed category field from EditableReview form
+- Cleaned up unused imports (FOOD_CATEGORIES, DEFAULT_STORAGE_BY_CATEGORY)
+- Removed "Category doesn't match" from flag reasons
 
 ---
 
@@ -227,22 +242,24 @@ updated_at            TIMESTAMP
 
 ## 🚀 Deployment Commands
 
-### Rebuild Mobile App
+### Rebuild Mobile App (Full Native Rebuild)
 ```bash
 cd /Users/macmini/Desktop/scanner
 npx expo run:ios --device "00008110-001645D13C47801E"
 ```
+**Note:** Only needed when changing native code (ML Kit, camera, etc.). Takes 2-3 minutes.
+
+### Start Metro Bundler (JavaScript Hot Reload)
+```bash
+npx expo start
+# Then connect app to: http://192.168.0.211:8081
+```
+**Note:** Use this for JavaScript-only changes. Instant reload.
 
 ### Deploy Edge Function
 ```bash
 cd /Users/macmini/Desktop/scanner
 supabase functions deploy scanner-ingest
-```
-
-### Start Metro Bundler
-```bash
-npx expo start
-# Then connect app to: http://192.168.0.211:8081
 ```
 
 ### Check Supabase Link
@@ -268,9 +285,16 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 ```
 
 ### "Product Not Found" Error
-**Symptom:** Edge function returns `success: false, error: "Product not found"`
-**Cause:** Barcode not in Nutritionix database (QR codes, non-UPC barcodes)
-**Expected:** This is normal - not all barcodes are UPC/EAN codes with product data
+**Symptom:** Alert shows "This barcode was not found in the nutritional database"
+**Cause:** Barcode not in Nutritionix database (QR codes, non-UPC barcodes, or obscure products)
+**Expected Behavior:** This is normal - not all codes are UPC/EAN product barcodes
+**User Action:** User can choose "Manual Entry" or "Try Again"
+
+### OCR Can't Read Expiration Date
+**Symptom:** "No Date Found" dialog appears
+**Cause:** Text is embossed/stamped on curved surface with poor contrast
+**Expected Behavior:** This is a known limitation of OCR on embossed metal
+**User Action:** User taps "Enter Manually" and uses date picker - works perfectly!
 
 ### Metro Bundler Won't Connect
 **Symptom:** App shows "No development servers found"
@@ -279,33 +303,39 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 2. In app, tap "Enter URL manually"
 3. Enter: `192.168.0.211:8081`
 
-### Icon Not Showing
-**Symptom:** Blank white icon on iPhone
-**Fix:** Icon is cached - delete app and reinstall with `npx expo run:ios --device`
+### Brand or Storage Location Shows Wrong
+**Symptom:** Brand empty or storage showing "undefined"
+**Status:** FIXED in this session
+**If it happens again:** Check that EditableReview is receiving `storageLocations` prop
 
 ---
 
 ## 📝 Next Steps / Future Improvements
 
-### Short-Term (Production Ready)
+### Short-Term (Current Status)
 - ✅ All core features working
 - ✅ Edge function deployed
 - ✅ Database schema complete
 - ✅ App icon visible
+- ✅ Error handling for invalid barcodes
+- ✅ Manual date entry working
+- ✅ Review screen displaying all data correctly
+- ✅ Category field removed
 
 ### Medium-Term Enhancements
-1. **Error Handling:** Better UI feedback when product not found
-2. **Offline Support:** Queue scans when offline, sync later
-3. **Manual Entry:** Allow manual product entry if barcode fails
-4. **Household Selection:** Let users switch households
-5. **Scan History:** View previous scans in the app
+1. **Scan History View:** Show list of previously scanned items in the app
+2. **Edit Scans:** Allow editing/deleting scanned items
+3. **Offline Support:** Queue scans when offline, sync when back online
+4. **Better Package Size Entry:** Pre-populate from Nutritionix serving size data
+5. **Household Selection:** Let users switch between households
 
 ### Long-Term Architecture
-1. **Remove constants.js:** Eliminate hardcoded STORAGE_LOCATIONS constant
-2. **Admin UI:** Let users manage storage locations
-3. **Analytics:** Track scanning patterns and inventory trends
-4. **Notifications:** Alert when products near expiration
+1. **Remove constants.js:** Eliminate hardcoded STORAGE_LOCATIONS constant entirely
+2. **Admin UI:** Let users manage storage locations (add/edit/delete)
+3. **Analytics Dashboard:** Track scanning patterns, inventory levels, expiration alerts
+4. **Notifications:** Alert users when products are near expiration
 5. **Multi-household:** Support multiple households per user
+6. **Barcode Database:** Build custom database for products not in Nutritionix
 
 ---
 
@@ -315,28 +345,40 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 - **Supabase SQL Editor:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk/sql
 - **Edge Functions:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk/functions
 - **Nutritionix API Docs:** https://developer.nutritionix.com/
+- **Google ML Kit:** https://developers.google.com/ml-kit/vision/text-recognition
 
 ---
 
 ## 💡 What Claude Should Know Next Session
 
 **Quick Start Prompt:**
-> "Read HANDOFF.md. The scanner app is fully functional with the edge function deployed. What do you need help with?"
+> "Read HANDOFF.md. The scanner app is fully functional. The latest session fixed error handling, manual date entry, and review screen display issues. What would you like to work on?"
 
 **Key Context:**
-1. Edge function `scanner-ingest` is deployed and working
-2. Database has `scans` table with proper RLS
-3. App has MB icon and is on iPhone
-4. Two-step workflow (barcode → expiration) is functional
-5. All UUIDs are being used correctly (no more integer IDs)
+1. ✅ **Two-step workflow is fully functional** - Barcode scan → expiration date → review → save
+2. ✅ **Error handling works** - Invalid barcodes show friendly error with manual entry option
+3. ✅ **OCR is acceptable** - We know it fails on embossed metal, manual entry is the solution (don't try to fix OCR)
+4. ✅ **Review screen is clean** - Brand, storage location display correctly. Category field removed.
+5. ✅ **All UUIDs working** - Database locations passed as props throughout the app
+
+**Important Design Decisions:**
+- **OCR limitations are accepted** - Don't waste time trying to fix OCR for embossed text. Manual entry works great.
+- **Category removed** - User decided it wasn't useful
+- **Manual entry is primary** - OCR is nice-to-have, manual entry is the reliable path
 
 **Common Requests:**
-- "The app isn't working" → Check Metro bundler, edge function logs
-- "Product not found" → Expected for non-UPC barcodes, consider manual entry feature
-- "Need to add X feature" → Core architecture is solid, ready for enhancements
+- "The app isn't working" → Check Metro bundler (`npx expo start`), check edge function logs
+- "OCR not working" → This is expected for embossed text. Manual entry is the solution.
+- "Need to add X feature" → Core architecture is solid, ready for enhancements from "Next Steps" section
+- "Product not found" → Expected for QR codes and non-UPC barcodes
+
+**Files Most Likely to Edit Next:**
+- `components/BarcodeScanner.js` - Main scanning logic
+- `components/EditableReview.js` - Review screen UI
+- `supabase/functions/scanner-ingest/index.ts` - Backend logic
 
 ---
 
 **End of Handoff Document**
-**Status:** ✅ Production Ready
-**Last Updated:** October 18, 2025, 1:43 PM
+**Status:** ✅ Production Ready - All Core Features Working
+**Last Updated:** October 18, 2025, 3:15 PM

@@ -11,17 +11,13 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { STORAGE_LOCATIONS, DEFAULT_STORAGE_BY_CATEGORY, FOOD_CATEGORIES } from '../utils/constants';
+import { STORAGE_LOCATIONS } from '../utils/constants';
 import { correctVolume, getVolumeSuggestion } from '../utils/volumeCorrection';
-
-// Use the new food-based categories from constants
-const CATEGORIES = FOOD_CATEGORIES;
 
 const FLAG_REASONS = [
   'Volume/size looks wrong',
   'Wrong product detected',
   'Brand name incorrect',
-  'Category doesn\'t match',
   'Nutrition info seems off',
   'Image doesn\'t match',
   'Other issue'
@@ -34,6 +30,7 @@ export default function EditableReview({
   onFlag,
   productData,
   selectedStorage,
+  storageLocations,
   loading
 }) {
   const [editedData, setEditedData] = useState({});
@@ -46,7 +43,7 @@ export default function EditableReview({
     if (productData) {
       setEditedData({
         name: productData.name || '',
-        brand_name: productData.brand_name || '',
+        brand_name: productData.brand_name || productData.brand || '',
         suggested_category: productData.suggested_category || '',
         package_description: productData.package_description || '',
         expiration_date: productData.expiration_date || '',
@@ -210,7 +207,7 @@ export default function EditableReview({
     setShowFlagModal(false);
   };
 
-  const storageLocation = STORAGE_LOCATIONS.find(loc => loc.id === selectedStorage);
+  const storageLocation = (storageLocations || STORAGE_LOCATIONS).find(loc => loc.id === selectedStorage);
   const hasChanges = Object.keys(getChangedFields()).length > 0;
   const hasWarnings = validationWarnings.length > 0;
 
@@ -255,13 +252,6 @@ export default function EditableReview({
                 warning={validationWarnings.find(w => w.field === 'brand')}
               />
 
-              <CategoryPicker
-                label="Category"
-                value={editedData.suggested_category}
-                onValueChange={(value) => handleFieldChange('suggested_category', value)}
-                warning={validationWarnings.find(w => w.field === 'category')}
-              />
-
               <View style={styles.volumeSection}>
                 <Text style={styles.sectionTitle}>Package Size</Text>
                 {validationWarnings.find(w => w.field === 'volume') && (
@@ -299,9 +289,9 @@ export default function EditableReview({
                 />
               </View>
 
-              <DetailRow 
-                label="Storage Location" 
-                value={`${storageLocation?.icon} ${storageLocation?.name}`}
+              <DetailRow
+                label="Storage Location"
+                value={storageLocation?.name || 'Unknown'}
                 confidence={productData.confidence_score}
               />
 
@@ -429,55 +419,6 @@ function FormField({ label, value, onChangeText, placeholder, warning }) {
       {warning && (
         <Text style={styles.fieldWarning}>⚠️ {warning.message}</Text>
       )}
-    </View>
-  );
-}
-
-function CategoryPicker({ label, value, onValueChange, warning }) {
-  const [showPicker, setShowPicker] = useState(false);
-
-  return (
-    <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TouchableOpacity 
-        style={[styles.pickerButton, warning && styles.fieldInputWarning]}
-        onPress={() => setShowPicker(true)}
-      >
-        <Text style={styles.pickerButtonText}>{value || 'Select category'}</Text>
-        <Text style={styles.pickerArrow}>▼</Text>
-      </TouchableOpacity>
-      
-      {warning && (
-        <Text style={styles.fieldWarning}>⚠️ {warning.message}</Text>
-      )}
-
-      <Modal visible={showPicker} animationType="slide" transparent={true}>
-        <View style={styles.pickerModalOverlay}>
-          <View style={styles.pickerModalContent}>
-            <Text style={styles.pickerTitle}>Select Category</Text>
-            <ScrollView>
-              {CATEGORIES.map((category, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.categoryItem}
-                  onPress={() => {
-                    onValueChange(category);
-                    setShowPicker(false);
-                  }}
-                >
-                  <Text style={styles.categoryText}>{category}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity 
-              style={styles.pickerCancelButton}
-              onPress={() => setShowPicker(false)}
-            >
-              <Text style={styles.pickerCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

@@ -216,6 +216,16 @@ class ScannerAPI {
         return { success: false, error: response.error.message || 'Step 1 failed' };
       }
 
+      // Check if the edge function returned success: false (e.g., product not found)
+      if (response.data && !response.data.success) {
+        console.error('❌ Product not found:', response.data.error);
+        return {
+          success: false,
+          error: response.data.error || 'Product not found',
+          barcode: response.data.barcode
+        };
+      }
+
       console.log('✅ Step 1 success:', response.data);
       return {
         success: true,

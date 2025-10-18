@@ -126,14 +126,14 @@ export default function BarcodeScanner({ onProductScanned }) {
     try {
       // Step 1: Submit barcode with storage location
       const step1Result = await scannerAPI.step1Barcode(scannedData.barcode, location.id);
-      
+
       if (step1Result.success) {
         console.log('✅ Step 1 complete, scan ID:', step1Result.scan_id);
         console.log('📦 Product:', step1Result.product);
-        
+
         setCurrentScanId(step1Result.scan_id);
         setWorkflowStep(2);
-        
+
         // Store product data from step 1
         if (step1Result.product) {
           setProductData({
@@ -142,11 +142,19 @@ export default function BarcodeScanner({ onProductScanned }) {
             confidence_score: step1Result.confidence_score
           });
         }
-        
+
         // Show expiration date capture for step 2
         setShowExpirationCapture(true);
       } else {
-        throw new Error(step1Result.error || 'Failed to process barcode');
+        // Product not found - notify user
+        Alert.alert(
+          'Product Not Found',
+          `This barcode (${scannedData.barcode}) was not found in the nutritional database. This often happens with QR codes or non-UPC barcodes.\n\nWould you like to enter this product manually?`,
+          [
+            { text: 'Manual Entry', onPress: () => setShowManualEntry(true) },
+            { text: 'Try Again', onPress: () => resetScanner() }
+          ]
+        );
       }
     } catch (error) {
       console.error('❌ Step 1 error:', error);
@@ -579,6 +587,7 @@ export default function BarcodeScanner({ onProductScanned }) {
           ocr_confidence: expirationData?.confidence
         }}
         selectedStorage={selectedStorage}
+        storageLocations={storageLocations}
         loading={loading}
       />
 

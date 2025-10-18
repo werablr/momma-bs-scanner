@@ -41,6 +41,7 @@ class OCRService {
 
       console.log('✅ OCR text recognized:', result.text.substring(0, 100) + '...');
       console.log('📊 OCR blocks found:', result.blocks?.length || 0);
+      console.log('📝 Full OCR text:', result.text);
 
       return {
         success: true,
@@ -97,24 +98,36 @@ class OCRService {
       }
 
       const expirationResult = extractExpirationDate(ocrResult.text);
-      
+      console.log(`📅 Initial extraction result:`, {
+        date: expirationResult.date,
+        confidence: expirationResult.confidence,
+        rawText: expirationResult.rawText
+      });
+
       // Try to find expiration date in individual blocks if main text didn't work well
       if (expirationResult.confidence < 0.7 && ocrResult.blocks.length > 0) {
+        console.log(`🔍 Trying individual blocks (${ocrResult.blocks.length} blocks)`);
         const blockTexts = ocrResult.blocks.map(block => block.text);
-        
-        for (const blockText of blockTexts) {
+
+        for (let i = 0; i < blockTexts.length; i++) {
+          const blockText = blockTexts[i];
+          console.log(`  Block ${i}: "${blockText}"`);
           const blockResult = extractExpirationDate(blockText);
+          console.log(`  Block ${i} result:`, blockResult);
+
           if (blockResult.confidence > expirationResult.confidence) {
             expirationResult.date = blockResult.date;
             expirationResult.confidence = blockResult.confidence;
             expirationResult.rawText = blockResult.rawText;
+            console.log(`  ✅ Better match found in block ${i}!`);
           }
         }
       }
 
       const processingTime = Date.now() - startTime;
       console.log(`🔍 OCR processing time: ${processingTime}ms`);
-      console.log(`📊 OCR confidence: ${Math.round(expirationResult.confidence * 100)}%`);
+      console.log(`📊 Final OCR confidence: ${Math.round(expirationResult.confidence * 100)}%`);
+      console.log(`📅 Final date: ${expirationResult.date}`);
       
       return {
         success: true,
