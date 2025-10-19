@@ -481,9 +481,43 @@ Barcode Scan Flow:
 - **Open Food Facts:** nutriscore_grade, nova_group, ecoscore_grade, is_vegan, allergens, packaging_type, origins
 - **Manual/Calculated:** servings_per_container (can calculate: package_size ÷ serving_size)
 
+### Package Size Challenge & Solution
+
+**Discovery (Oct 18, 4:20 PM):**
+After testing all available APIs, we found that **NO API provides structured package size data**:
+- All APIs only have serving sizes or package sizes embedded in text fields
+- UPCitemdb has best data but in title: "BUSH'S Reduced Sodium Black Beans **15 oz**"
+- Regex parsing is fragile (breaks with "15oz" vs "15 oz" vs "425g")
+
+**Solution: Multi-Layer Detection + User-Verified Catalog**
+Instead of relying on one brittle approach, we use **5 priority layers** with user confirmation:
+1. Our `product_catalog` (previously scanned/verified)
+2. Open Food Facts validation
+3. Smart regex parsing (multiple patterns)
+4. OCR package label
+5. Manual entry
+
+Every scan shows: **"We found: 15 oz - Is this correct?"** allowing user verification.
+Corrections are saved to `product_catalog` so the system learns and improves over time.
+
 ### Extended Database Schema (70+ new fields!)
 
 **Migration created:** `20251018160000_add_extended_product_fields.sql`
+
+**Additional table needed:** `product_catalog`
+```sql
+CREATE TABLE product_catalog (
+  barcode TEXT PRIMARY KEY,
+  package_size DECIMAL,
+  package_unit TEXT,
+  servings_per_container DECIMAL,
+  verified_by_user BOOLEAN DEFAULT true,
+  verified_at TIMESTAMP DEFAULT now(),
+  verification_count INTEGER DEFAULT 1,
+  last_seen TIMESTAMP DEFAULT now()
+);
+```
+Purpose: Store user-verified package sizes for instant lookup on future scans.
 
 **Package Information (UPCitemdb):**
 - `package_size`, `package_unit` (parsed from title: "15 oz")
@@ -534,20 +568,71 @@ Barcode Scan Flow:
 - Created analytics helper functions
 - Added indexes for common queries
 
-**Phase 2: Triple API Integration**
+**Phase 2: Multi-Layer Package Size Detection Strategy**
+
+**The Problem:**
+No API provides reliable structured package size data:
+- Nutritionix: Only has `serving_weight_grams` (130g serving, not 15 oz package)
+- UPCitemdb: `size` field is empty, package size only in `title` ("BUSH'S... 15 oz")
+- Open Food Facts: `product_quantity` shows serving size, not package size
+- Barcode Lookup: Business API (not free), app shows size but no API access
+
+**The Solution: Multi-Layer Approach (Priority Order)**
+
+```javascript
+Priority 1: Check our product_catalog table
+  → If we've seen this barcode before, use our saved data
+  → Fastest, most reliable (user-verified)
+
+Priority 2: Try Open Food Facts product_quantity
+  → Validate it makes sense (compare to serving_weight_grams)
+  → Sometimes correct, sometimes just serving size
+
+Priority 3: Parse UPCitemdb title with smart regex
+  → Multiple patterns: "15 oz", "425g", "1.5 lbs", etc.
+  → Extract both number and unit
+  → Fallback patterns for edge cases
+
+Priority 4: OCR the package label (like expiration dates)
+  → User takes photo of "NET WT 15 OZ" text
+  → Works for non-barcoded items too
+  → More reliable than title parsing
+
+Priority 5: Manual entry
+  → User types package size and unit
+  → Always works, always accurate
+
+Confirmation UI (always shown):
+  → "We found: 15 oz - Is this correct? [Edit]"
+  → User can verify/correct before saving
+  → Corrections saved to product_catalog for future scans
+```
+
+**Benefits:**
+- ✅ Fast for repeat products (our catalog lookup)
+- ✅ Automated when possible (Open Food Facts, title parsing)
+- ✅ OCR option (works for any package, even non-barcoded)
+- ✅ Manual fallback (100% success rate)
+- ✅ User verification (catch API errors)
+- ✅ Self-improving (builds catalog over time)
+- ✅ No regex fragility (multiple fallbacks)
+
+**Phase 3: Triple API Integration**
 - Update `scanner-ingest` edge function to call all three APIs
-- Parse UPCitemdb title for package size ("15 oz" → size: 15, unit: "oz")
+- Implement multi-layer package size detection
 - Parse Open Food Facts ingredients_analysis for dietary flags
 - Merge all three datasets into single record
 - Handle missing data gracefully (not all products in all DBs)
+- Create product_catalog table for user-verified data
 
-**Phase 3: Analytics Functions**
+**Phase 4: Analytics Functions**
 - `get_household_health_score()` - Calculate avg Nutri-Score, NOVA, vegan %
 - `get_price_trends()` - Analyze price history for products
 - More analytics functions as needed
 
-**Phase 4: Manual Entry UI**
-- Add package size fields to review screen (editable)
+**Phase 5: Enhanced UI**
+- Add package size fields to review screen (editable with confidence indicator)
+- Show package size source: "From our catalog ✓" vs "Parsed from title ⚠️"
 - Show health scores (Nutri-Score badge)
 - Display dietary tags (vegan, vegetarian icons)
 - Show pricing if available
@@ -703,7 +788,7 @@ Barcode Scan Flow:
 - **Fallback to manual entry** - If APIs don't have data, user can enter manually
 - **OCR limitations accepted** - Don't waste time on embossed text OCR. Manual entry works great.
 
-**Architecture Changes (Oct 18, 3:40-4:15 PM):**
+**Architecture Changes (Oct 18, 3:40-4:20 PM):**
 - ❌ Removed: `scans`, `scan_history` tables
 - ✅ Added: `inventory_items`, `inventory_history` tables
 - ✅ Updated: Edge function to capture full Nutritionix response
@@ -712,11 +797,17 @@ Barcode Scan Flow:
 - ✅ Decided: Triple API strategy (upgraded from dual!)
 - ✅ Created: Migration with 70+ extended fields
 - ✅ Added: Analytics SQL functions (health_score, price_trends)
+- ✅ Tested: All three APIs (Nutritionix, UPCitemdb, Open Food Facts)
+- ✅ Discovered: Package size challenge (no structured data in any API)
+- ✅ Designed: Multi-layer package size detection strategy (5 priority levels)
+- 🔜 TODO: Create product_catalog table for user-verified package sizes
 - 🔜 TODO: Deploy extended fields migration
+- 🔜 TODO: Implement multi-layer package size detection
 - 🔜 TODO: Implement UPCitemdb API integration in edge function
 - 🔜 TODO: Implement Open Food Facts API integration in edge function
-- 🔜 TODO: Parse UPCitemdb title for package size ("15 oz" → size/unit)
+- 🔜 TODO: Parse UPCitemdb title for package size (multiple regex patterns)
 - 🔜 TODO: Parse Open Food Facts ingredients_analysis for dietary flags
+- 🔜 TODO: Add package size confirmation UI ("We found: 15 oz - correct?")
 
 **Common Requests:**
 - "The app isn't working" → Check Metro bundler (`npx expo start`), check edge function logs
@@ -738,5 +829,5 @@ Barcode Scan Flow:
 ---
 
 **End of Handoff Document**
-**Status:** ✅ Triple API Strategy - Extended Schema Created - Ready for Deployment
-**Last Updated:** October 18, 2025, 4:15 PM
+**Status:** ✅ Triple API + Multi-Layer Package Detection - Schema Ready - Implementation Next
+**Last Updated:** October 18, 2025, 4:20 PM
