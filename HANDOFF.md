@@ -1,12 +1,181 @@
-# Scanner App - Session Handoff Document
+# Momma B's Scanner - App-Specific Handoff
 
-**Date:** October 19, 2025, 9:40 AM
-**Status:** ✅ Triple API Integration - Production Ready
-**Last Update:** Deployed Nutritionix + UPCitemdb + Open Food Facts with health scores & environmental data
+> **Part of Momma B's Household** → **Momma B's Kitchen**
+>
+> [Ecosystem Overview](../HANDOFF.md) | [Kitchen Subsystem](../Momma B's Kitchen/HANDOFF.md) | [Pantry App](../momma-bs-pantry/HANDOFF.md)
+
+**App:** Scanner (React Native - Mobile)
+**Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
+**Purpose:** Data ingestion via barcode scanning
+**Date:** October 19, 2025, 6:50 PM
+**Status:** 🔄 Dev Mode - Internal Testing Phase (Production Ready, Awaiting Polish)
 
 ---
 
-## 🚀 Latest Session: Triple API Integration (Oct 19, 2025, 9:00-9:40 AM)
+## 🚀 Latest Session: Scanner Focus Delay Fix (Oct 20, 2025, 9:00-9:30 PM)
+
+**Mission:** Fix barcode scanner capturing blurry images by adding autofocus delay
+**Duration:** 30 minutes
+**Status:** ✅ **COMPLETE**
+
+### What We Accomplished
+
+#### Scanner Autofocus Delay Implemented ✅
+- **Issue:** Barcode scanner was capturing images too quickly before camera could autofocus, resulting in blurry barcodes
+- **Solution:** Added 800ms delay between barcode detection and processing
+- **Implementation:**
+  - Created separate `scanCooldown` ref to prevent duplicate scans during focus delay
+  - Camera remains active during 800ms delay to allow autofocus to stabilize
+  - After delay, `handleBarcodeScanned` is called with focused image
+- **Result:** Scanner now captures clear, readable barcodes consistently
+
+**Technical Details:**
+- Modified `onCodeScanned` callback in BarcodeScanner.js
+- Uses `scanCooldown.current` flag (separate from `isProcessing.current`)
+- Camera stays active during delay (doesn't deactivate like it would with `isProcessing`)
+- Prevents multiple scans of same barcode during the 800ms window
+
+---
+
+## 🚀 Previous Session: E2E Testing + Pantry App Planning (Oct 19, 2025, 5:00-5:30 PM)
+
+**Mission:** Test scanner app end-to-end, plan companion pantry viewing app
+**Duration:** 30 minutes
+**Status:** ✅ **COMPLETE**
+
+### What We Accomplished
+
+#### 1. End-to-End Testing Verified ✅
+- **Test #1:** Bush's Black Beans (0039400018834)
+  - Triple API integration working perfectly
+  - All data sources responded: Nutritionix ✅ UPCitemdb ✅ Open Food Facts ✅
+  - Package size parsed: 15 oz
+  - Health scores captured: Nutri-Score (a), NOVA (3), dietary flags (vegan, vegetarian)
+  - Environmental data: Can packaging, USA origin
+  - Data saved to `inventory_items` table successfully
+- **Test #2:** Different product tested, all systems operational
+- Metro bundler running stable
+- Edge function responding correctly (version 5)
+- OCR attempting date recognition, manual entry working as expected
+
+#### 2. Momma B's Pantry App - Architecture Designed 🎨
+
+**Purpose:** Separate web app for viewing and managing inventory (no scanner needed)
+
+**Core Use Case:**
+1. User searches: "Do I have beans?"
+2. App shows: Bush's Black Beans with photo for visual recognition
+3. User sees: Storage location (Pantry), expiration date, quantity
+4. User finds can in physical pantry using photo reference
+5. After using in recipe: Tap "Mark as Used"
+6. Backend archives item to `inventory_history` for analytics
+
+**MVP Features (Phase 1):**
+- 🔍 Search inventory by keywords (product name, brand)
+- 📋 View inventory list with photos
+- 🖼️ Item detail view (photo, location, expiration, quantity, health scores)
+- ✅ "Mark as Used" button (one tap archives with defaults)
+- 🏷️ Filter by storage location (Pantry, Fridge, Freezer, etc.)
+
+**Scalable Architecture (Future Phases):**
+- Phase 2: Edit item details (quantity, expiration, location)
+- Phase 3: Partial consumption tracking (volume_remaining)
+- Phase 4: Shopping list generation from consumed items
+- Phase 5: Analytics dashboard (consumption patterns, waste analysis)
+- Phase 6: Expiration alerts and notifications
+
+**Tech Stack Decision:**
+```
+Platform:     Next.js 14 (App Router) - works on phone + computer browser
+Database:     Supabase (same instance as scanner app)
+UI:           Tailwind CSS + shadcn/ui components
+Auth:         Supabase Auth (household-based, same as scanner)
+Search:       Supabase queries with text matching
+Deployment:   Vercel (free tier, accessible from anywhere)
+```
+
+**Why Next.js Web App vs React Native:**
+- ✅ Works on computer AND phone (user requirement)
+- ✅ No app store deployment needed
+- ✅ Faster to build and iterate
+- ✅ Can be installed as PWA on phone
+- ✅ Scanner app stays lightweight and camera-focused
+- ✅ Separate concerns: scanning vs viewing/managing
+
+**Database - Already Ready:**
+- `inventory_items` table has all data (100+ fields)
+- `inventory_history` table ready for archived items
+- `archive_inventory_item()` function ready to use
+- Photos available (`photo_thumb`, `photo_highres`)
+- Health scores, dietary flags, package sizes all captured
+
+**User Experience Design:**
+```
+Home Screen:
+┌─────────────────────────────────┐
+│ Momma B's Pantry       🔍 Search│
+├─────────────────────────────────┤
+│ 🔴 Expiring Soon (3 items)      │
+├─────────────────────────────────┤
+│ Filters: [All] [Pantry] [Fridge]│
+├─────────────────────────────────┤
+│ ┌─────────────────────────────┐ │
+│ │ 🖼️ Bush's Black Beans       │ │
+│ │    Pantry • Expires Oct 27  │ │
+│ │    15 oz • Nutri-Score: A   │ │
+│ └─────────────────────────────┘ │
+└─────────────────────────────────┘
+
+Detail Screen:
+┌─────────────────────────────────┐
+│ ← Back                          │
+├─────────────────────────────────┤
+│      [Product Photo]            │
+│ Bush's Black Beans              │
+│ Bush's Best                     │
+│                                 │
+│ 📍 Location: Pantry             │
+│ 📅 Expires: Oct 27, 2025        │
+│ 📦 Size: 15 oz                  │
+│ 🏷️ Nutri-Score: A (Healthy)     │
+│ 🌱 Vegan • Vegetarian           │
+│                                 │
+│ [Mark as Used]                  │
+└─────────────────────────────────┘
+```
+
+**Mark as Used Behavior (MVP):**
+- One tap action (no additional prompts for MVP)
+- Backend calls: `archive_inventory_item(item_id, today's_date, 'consumed', null)`
+- Item moves from `inventory_items` → `inventory_history`
+- Item disappears from active inventory list
+- Analytics can be run on history table later
+
+### 🎯 Design Decisions
+
+1. **Start Simple, Build Scalable**
+   - MVP: Search, view, mark as used (core workflow only)
+   - Architecture supports future features without refactoring
+   - Database already has all fields needed for advanced features
+
+2. **Two Separate Apps Strategy**
+   - **Scanner App (React Native):** Barcode scanning + camera OCR (mobile-only)
+   - **Pantry App (Next.js):** View + manage inventory (phone + computer)
+   - Shared backend (Supabase), single source of truth
+
+3. **Photo-First Design**
+   - Visual recognition is key use case
+   - Large photos help identify items in crowded pantry
+   - Nutritionix photos are high quality
+
+4. **One-Tap Actions**
+   - Keep MVP simple: "Mark as Used" = one tap
+   - No forms, no date pickers, no notes (for MVP)
+   - Can add optional fields in Phase 2
+
+---
+
+## 🚀 Previous Session: Triple API Integration (Oct 19, 2025, 9:00-9:40 AM)
 
 **Mission:** Deploy Triple API Integration
 **Duration:** 40 minutes
@@ -179,40 +348,76 @@ Bush's Black Beans (0039400018834):
 
 ### 🚀 Next Steps (Priority Order)
 
-**High Priority - UI Enhancements:**
-1. **Package Size Confirmation UI**
+**🔥 HIGHEST PRIORITY - Momma B's Pantry App (NEW):**
+
+**Phase 1 - MVP (Build This Now):**
+1. **Create Next.js App Structure**
+   - Initialize Next.js 14 project at `/Users/macmini/Desktop/pantry-app`
+   - Set up Tailwind CSS + shadcn/ui
+   - Configure Supabase connection (same instance as scanner)
+   - Set up environment variables
+
+2. **Inventory List Page**
+   - Query `inventory_items` filtered by household_id
+   - Display items in list view with:
+     - Product photo (from `photo_thumb`)
+     - Product name + brand
+     - Storage location
+     - Expiration date
+     - Package size
+     - Nutri-Score badge
+
+3. **Search Functionality**
+   - Search bar at top
+   - Filter by keywords (food_name, brand_name)
+   - Real-time filtering as user types
+
+4. **Storage Location Filters**
+   - Quick filter buttons: All, Pantry, Fridge, Freezer, etc.
+   - Use `storage_locations` table for dynamic filters
+
+5. **Item Detail Page**
+   - Large product photo
+   - Full product information
+   - Nutrition facts display
+   - Health scores with visual badges
+   - "Mark as Used" button
+
+6. **Mark as Used Functionality**
+   - Call Supabase RPC: `archive_inventory_item(item_id, current_date, 'consumed', null)`
+   - Show success toast
+   - Remove item from list (optimistic update)
+   - Return to inventory list
+
+7. **Deploy to Vercel**
+   - Connect GitHub repo
+   - Configure environment variables
+   - Deploy and test on phone + computer
+
+**Phase 2 - Enhanced Features (Later):**
+8. Edit item details (quantity, expiration, location)
+9. Partial consumption tracking (volume_remaining)
+10. Expiring soon alerts (< 7 days badge)
+11. Analytics dashboard preview
+
+**Medium Priority - Scanner App Enhancements:**
+12. **Package Size Confirmation UI**
    - Show: "We found: 15 oz - Is this correct? [Edit]"
    - Allow user to verify/correct before saving
    - Save corrections to product_catalog
 
-2. **Health Score Badges in Review Screen**
+13. **Health Score Badges in Review Screen**
    - Nutri-Score: Color-coded badge (A=green, E=red)
    - NOVA Group: Processing level indicator
    - Dietary icons: 🌱 vegan, 🥗 vegetarian
 
-3. **User Correction Interface**
-   - Edit package size after scan
-   - Mark corrections as "user_verified: true"
-   - Update product_catalog for future scans
-
-**Medium Priority - Inventory Features:**
-4. **Inventory List View**
-   - Show all active inventory_items
-   - Filter by storage location
-   - Sort by expiration date
-
-5. **Mark as Consumed**
-   - Call `archive_inventory_item()` function
-   - Prompt for: consumed date, waste reason, notes
-   - Move to inventory_history table
-
-**Low Priority - Analytics:**
-6. **Health Dashboard**
+**Low Priority - Analytics (Future):**
+14. **Health Dashboard**
    - Call `get_household_health_score()` RPC
    - Display: avg Nutri-Score, % vegan, % ultra-processed
    - Show trends over time
 
-7. **Price Tracking UI**
+15. **Price Tracking UI**
    - Display current price on review screen
    - Show price history chart
    - Alert on price drops
@@ -238,15 +443,43 @@ The scanner app has been **restructured with a scalable database design**:
 
 ## 🔑 Key System Components
 
-### Mobile App
+## 🏠 Momma B's Household - Project Ecosystem
+
+**Project Structure:**
+```
+/Users/macmini/Desktop/
+├── scanner/              (Momma B's Scanner - React Native)
+│   └── Ingests data into inventory_items table
+└── pantry-app/           (Momma B's Pantry - Next.js)
+    └── Reads & manages data from inventory_items table
+```
+
+**Key Architecture:**
+- **Sibling Projects:** Two separate apps, equal hierarchy
+- **Shared Backend:** Single Supabase instance, same tables
+- **Clear Separation:** Scanner ingests, Pantry displays
+- **Single Source of Truth:** `inventory_items` table
+
+### Scanner App (React Native - Mobile Only)
 - **Location:** `/Users/macmini/Desktop/scanner`
 - **Platform:** React Native with Expo
 - **Deployment:** Development build on iPhone (Device ID: 00008110-001645D13C47801E)
 - **App Name:** "Momma B's Scanner"
 - **App Icon:** Blue gradient with white "MB" letters
 - **Metro Bundler:** Running on http://192.168.0.211:8081
+- **Purpose:** Barcode scanning + camera OCR → Writes to `inventory_items`
+- **Responsibility:** Data ingestion only
 
-### Backend (Supabase)
+### Pantry App (Next.js - Phone + Computer) 🆕
+- **Location:** `/Users/macmini/Desktop/pantry-app`
+- **Platform:** Next.js 14 (App Router)
+- **Deployment:** Vercel (accessible via browser on any device)
+- **App Name:** "Momma B's Pantry"
+- **Purpose:** View inventory, search items, mark as used → Reads from `inventory_items`
+- **Responsibility:** Data display and management only
+- **Status:** ✅ Initialized (Next.js + Supabase installed)
+
+### Backend (Supabase - Shared by Both Apps)
 - **Project ID:** bwglyyfcdjzvvjdxxjmk
 - **Project URL:** https://bwglyyfcdjzvvjdxxjmk.supabase.co
 - **Edge Function:** `scanner-ingest` (deployed)
@@ -1032,90 +1265,107 @@ Confirmation UI (always shown):
 
 ## 💡 What Claude Should Know Next Session
 
-**Quick Start Prompt (UPDATED Oct 19, 2025 - 9:40 AM):**
-> "Read HANDOFF.md. ✅ TRIPLE API INTEGRATION COMPLETE! All migrations deployed, edge function updated with Nutritionix + UPCitemdb + Open Food Facts. Product catalog caching working. Health scores (Nutri-Score, NOVA), dietary flags (vegan/vegetarian), and environmental data (packaging, origin) now captured. Tested successfully with Bush's Black Beans. Next: Enhance UI to display health scores and package size confirmation."
+**Quick Start Prompt (UPDATED Oct 19, 2025 - 5:30 PM):**
+> "Read HANDOFF.md. ✅ E2E TESTING COMPLETE! Scanner app working perfectly with triple API integration. ✅ PANTRY APP ARCHITECTURE DESIGNED - Ready to build Next.js web app for viewing/managing inventory. Next priority: Create Momma B's Pantry app (Phase 1 MVP - 7 steps outlined in 'Next Steps' section)."
 
 **Key Context:**
-1. ✅ **NEW DATABASE ARCHITECTURE** - inventory_items (active) + inventory_history (consumed)
-2. ✅ **Full Nutritionix capture** - 40+ fields including nutrition, photos, metadata, JSONB nutrients
-3. ✅ **TRIPLE API STRATEGY DEPLOYED** - Nutritionix + UPCitemdb + Open Food Facts (Oct 19, 2025)
-4. ✅ **EXTENDED SCHEMA DEPLOYED** - 70+ new fields for package, pricing, health, environment
-5. ✅ **MIGRATIONS DEPLOYED** - All migrations applied to production database
-6. ✅ **PRODUCT CATALOG WORKING** - Caching system operational, second scans instant
-7. ✅ **HEALTH SCORES WORKING** - Nutri-Score: a, NOVA: 3, vegan/vegetarian flags captured
-8. ✅ **PACKAGE SIZE PARSING** - 15 oz parsed from UPCitemdb title successfully
-9. ✅ **Analytics Functions** - Helper functions for health_score and price_trends
-10. ✅ **Two-step workflow functional** - Barcode scan → expiration date → review → save
-11. ✅ **Error handling works** - Invalid barcodes show friendly error with manual entry option
-12. ✅ **Test successful** - Bush's Black Beans scanned with full triple API data
+1. ✅ **TWO APP STRATEGY DECIDED** - Scanner (React Native) + Pantry (Next.js web)
+2. ✅ **SCANNER APP COMPLETE** - E2E tested, triple API working, all data saving correctly
+3. ✅ **PANTRY APP DESIGNED** - Architecture complete, ready to build
+4. ✅ **DATABASE READY** - inventory_items + inventory_history + archive function all operational
+5. ✅ **TRIPLE API DEPLOYED** - Nutritionix + UPCitemdb + Open Food Facts (100+ fields per item)
+6. ✅ **HEALTH SCORES CAPTURED** - Nutri-Score, NOVA, dietary flags, environmental data
+7. ✅ **PACKAGE SIZE PARSING** - Working from UPCitemdb titles
+8. ✅ **PRODUCT CATALOG CACHING** - Second scans instant, avoids rate limits
+9. ✅ **PHOTOS AVAILABLE** - photo_thumb and photo_highres in database
+10. ✅ **ARCHIVE FUNCTION READY** - `archive_inventory_item()` ready for "Mark as Used"
+
+**Pantry App - Core Use Case:**
+- User searches: "Do I have beans?"
+- App shows: Bush's Black Beans with photo
+- User sees: Location (Pantry), expiration, quantity
+- User finds can using photo reference
+- After using: Tap "Mark as Used"
+- Backend: Archives to inventory_history
+
+**Pantry App - MVP Features (Phase 1):**
+1. Search inventory by keywords
+2. View list with photos
+3. Filter by storage location
+4. Item detail page (photo, info, nutrition, health scores)
+5. "Mark as Used" button (one tap archive)
+6. Deploy to Vercel (accessible on phone + computer)
 
 **Important Design Decisions:**
+- **Momma B's Household Ecosystem** - Two sibling apps, one shared backend
+  - **Scanner App:** Ingests data (barcode → API → database)
+  - **Pantry App:** Displays data (database → search/view → archive)
+  - **Equal Hierarchy:** Both are top-level projects, not nested
+  - **Shared Backend:** Single Supabase instance, same `inventory_items` table
+  - **Clear Separation:** Scanner writes, Pantry reads (single responsibility)
+- **Platform Choices:**
+  - Scanner: React Native (mobile-only, needs camera hardware)
+  - Pantry: Next.js web (works on phone + computer, no hardware needed)
+- **Start Simple, Build Scalable** - MVP has core features, architecture supports future enhancements
+- **Photo-First Design** - Visual recognition key for finding items in crowded pantry
+- **One-Tap Actions** - "Mark as Used" = one tap, no forms (MVP keeps it simple)
 - **Triple API Strategy** - Maximum product intelligence from 3 free sources
   - Nutritionix (36 fields): Best nutrition data
   - UPCitemdb (18 fields): Package size, pricing, dimensions
   - Open Food Facts (227 fields!): Health scores, environment, dietary tags
-- **281+ total fields available** - Most comprehensive product database possible
-- **100% FREE** - All three APIs have sufficient free tiers (UPCitemdb: 100/day bottleneck)
-- **Caching strategy** - product_catalog table stores verified data, avoids re-calling APIs
-- **Analytics-first** - Schema designed for future insights (health, price, environment)
-- **Scalable first** - Database designed for analytics, price tracking, volume management from day 1
-- **Single source of truth** - inventory_items for active, inventory_history for consumed
-- **Incremental deployment** - Test each API separately before merging all three
-- **Migration before code** - Deploy schema FIRST, then update edge function (columns must exist)
-- **Fallback to manual entry** - If APIs don't have data, user can enter manually
-- **OCR limitations accepted** - Don't waste time on embossed text OCR. Manual entry works great.
 
-**External Validation (Oct 19, 2025):**
-- ✅ Architecture reviewed and confirmed sound
-- ✅ Deployment order validated: schema → caching → APIs → helpers → UI
-- ⚠️ Rate limit strategy critical: cache product data to avoid hitting UPCitemdb cap
-- ⚠️ Test migration on staging/local before production deployment
-- ✅ Analytics helpers will validate data quality from new API integrations
+**Pantry App Tech Stack:**
+```
+Platform:     Next.js 14 (App Router)
+Database:     Supabase (same instance as scanner)
+UI:           Tailwind CSS + shadcn/ui components
+Auth:         Supabase Auth (household-based)
+Search:       Supabase text queries
+Deployment:   Vercel (free tier)
+Location:     /Users/macmini/Desktop/pantry-app (to be created)
+```
 
-**Architecture Changes (Oct 18, 3:40-4:20 PM):**
-- ❌ Removed: `scans`, `scan_history` tables
-- ✅ Added: `inventory_items`, `inventory_history` tables
-- ✅ Updated: Edge function to capture full Nutritionix response
-- ✅ Updated: Mobile app to use `item_id` instead of `scan_id`
-- ✅ Added: `archive_inventory_item()` helper function
-- ✅ Decided: Triple API strategy (upgraded from dual!)
-- ✅ Created: Migration with 70+ extended fields
-- ✅ Added: Analytics SQL functions (health_score, price_trends)
-- ✅ Tested: All three APIs (Nutritionix, UPCitemdb, Open Food Facts)
-- ✅ Discovered: Package size challenge (no structured data in any API)
-- ✅ Designed: Multi-layer package size detection strategy (5 priority levels)
-- ✅ External review (Oct 19): Architecture validated, deployment order confirmed
+**Production Timeline (Oct 19, 2025 - 6:50 PM):**
 
-**Updated TODO (Oct 19, 2025 - 9:40 AM):**
-1. ✅ ~~Deploy extended fields migration~~ **DONE**
-2. ✅ ~~Create product_catalog table~~ **DONE**
-3. ✅ ~~Implement UPCitemdb API integration~~ **DONE**
-4. ✅ ~~Implement Open Food Facts API integration~~ **DONE**
-5. ✅ ~~Parse UPCitemdb title for package size~~ **DONE**
-6. ✅ ~~Parse Open Food Facts dietary flags~~ **DONE**
-7. ✅ ~~Build analytics helpers~~ **DONE** (get_household_health_score, get_price_trends)
-8. 🔥 Add package size confirmation UI ("We found: 15 oz - correct?")
-9. 🔥 Display health scores in review screen (Nutri-Score badge, NOVA, dietary icons)
-10. 🔥 Add user correction interface for package sizes
-11. 🔥 Build inventory list view in mobile app
-12. 🔥 Add "Mark as Consumed" functionality
+**Phase 2: Internal Testing (Current - 2-4 Weeks)**
+1. ✅ ~~E2E test scanner app~~ **DONE**
+2. ✅ ~~Design pantry app architecture~~ **DONE**
+3. ✅ ~~Create Pantry app MVP~~ **DONE**
+4. 🔥 **DEPLOY PANTRY TO VERCEL** - Enable anywhere testing
+5. 🔥 **SCAN 20 REAL ITEMS** - Build actual inventory
+6. 🔥 **TEST FULL WORKFLOW** - Scan → Pantry → Mark as Used
+7. 📝 **DOCUMENT ISSUES** - Track improvements needed from testing
+8. 🔵 Add package size confirmation UI (based on testing feedback)
+9. 🔵 Display health score badges in review screen
+10. 🔵 Polish UX based on real-world usage
+
+**Phase 3: Production Deploy (Week 3-4)**
+11. 🚀 Submit Scanner to App Store (when 50+ scans complete and polished)
+12. 🚀 Pantry in production on Vercel (already deployed during testing)
+
+**Why Keep in Dev Mode:**
+- Pantry usage will reveal needed Scanner improvements
+- Package size confirmation UI needs real-world validation
+- Easier to iterate before App Store submission
+- Want 50+ successful scans before going live
 
 **Common Requests:**
-- "The app isn't working" → Check Metro bundler (`npx expo start`), check edge function logs
-- "OCR not working" → This is expected for embossed text. Manual entry is the solution.
-- "Need to add X feature" → Architecture is now scalable! See "Next Steps" for price tracking, volume management, analytics
+- "Build the pantry app" → Follow 7-step plan in "Next Steps" section
+- "Test scanner" → Run `npx expo start`, scan barcode, verify data in database
 - "Product not found" → Expected for QR codes and non-UPC barcodes
-- "Need to test" → Run full scan workflow, data should save to inventory_items table
+- "OCR not working" → This is expected for embossed text. Manual entry is the solution.
 
-**Files Most Likely to Edit Next:**
-- `components/BarcodeScanner.js` - Add inventory view, mark as consumed
-- `supabase/functions/scanner-ingest/index.ts` - Backend logic for new features
-- `services/scannerAPI.js` - Add methods for inventory queries
-- New: Create inventory list view component
-- New: Create analytics dashboard component
+**Files Most Likely to Create Next:**
+- `/Users/macmini/Desktop/pantry-app/` - New Next.js project directory
+- `pantry-app/app/page.tsx` - Inventory list page
+- `pantry-app/app/item/[id]/page.tsx` - Item detail page
+- `pantry-app/lib/supabase.ts` - Supabase client configuration
+- `pantry-app/.env.local` - Environment variables (same Supabase credentials)
 
 **Database Helper Functions Available:**
 - `archive_inventory_item(item_id, consumed_date, waste_reason, usage_notes)` - Move item to history
+- `get_household_health_score(household_id)` - Get health metrics (future analytics)
+- `get_price_trends(barcode, days)` - Get pricing data (future analytics)
 
 ---
 
@@ -1186,5 +1436,5 @@ RETURNS TABLE(
 ---
 
 **End of Handoff Document**
-**Status:** ✅ Triple API Integration DEPLOYED - Health Scores Working - Product Catalog Caching Operational
-**Last Updated:** October 19, 2025, 9:40 AM
+**Status:** 🔄 Dev Mode - Internal Testing Phase (Ready for 50+ scan validation)
+**Last Updated:** October 19, 2025, 6:50 PM

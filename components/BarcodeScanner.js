@@ -29,6 +29,7 @@ export default function BarcodeScanner({ onProductScanned }) {
   const [showOCRTesting, setShowOCRTesting] = useState(false);
   const [showWorkflowValidator, setShowWorkflowValidator] = useState(false);
   const isProcessing = useRef(false);
+  const scanCooldown = useRef(false);
 
   // Vision Camera hooks
   const device = useCameraDevice('back');
@@ -56,9 +57,18 @@ export default function BarcodeScanner({ onProductScanned }) {
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'ean-13', 'ean-8', 'upc-a', 'upc-e', 'code-128', 'code-39'],
     onCodeScanned: (codes) => {
-      if (isProcessing.current || codes.length === 0) return;
+      if (scanCooldown.current || codes.length === 0) return;
+
+      // Block additional scans for 800ms while camera focuses
+      scanCooldown.current = true;
       const code = codes[0];
-      handleBarcodeScanned({ type: code.type, data: code.value });
+
+      // Wait 800ms to allow camera autofocus to stabilize
+      // This prevents blurry barcode captures
+      setTimeout(() => {
+        scanCooldown.current = false;
+        handleBarcodeScanned({ type: code.type, data: code.value });
+      }, 800);
     },
   });
 
