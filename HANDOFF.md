@@ -571,7 +571,8 @@ The scanner app has been **restructured with a scalable database design**:
    ```
 6. Edge function updates scan record with expiration data and status "complete"
 7. User reviews product data on EditableReview screen
-8. User taps "Approve with Edits" to finalize
+8. **User sets volume remaining** (100%, 75%, 50%, 25%) - defaults to 100%
+9. User taps "Approve with Edits" to finalize
 
 ---
 
@@ -590,8 +591,9 @@ scanner/
 ├── components/                    # React Native components
 │   ├── BarcodeScanner.js          # Main scanner (uses database UUIDs, passes storageLocations)
 │   ├── StorageLocationPicker.js   # Location picker (accepts database locations prop)
-│   ├── EditableReview.js          # Review screen (FIXED: brand display, storage location display, category removed)
-│   └── ExpirationDateCapture.js   # OCR + manual date entry modal
+│   ├── EditableReview.js          # Review screen (includes volume remaining selector)
+│   ├── ExpirationDateCapture.js   # OCR + manual date entry modal
+│   └── VolumeSelector.js          # Volume remaining selector (100%, 75%, 50%, 25%)
 │
 ├── services/                      # API layer
 │   ├── scannerAPI.js              # Scanner API (FIXED: handles success:false from edge function)
@@ -1253,6 +1255,7 @@ Confirmation UI (always shown):
    - Package size confirmation with source badges
    - Health score displays (Nutri-Score, dietary tags)
    - Price display and user correction interface
+   - **Volume remaining selector** (100%, 75%, 50%, 25%) - for scanning partial products
 
 6. **Inventory View:** Show active inventory_items in the app
 7. **Edit Items:** Allow editing/deleting inventory items
