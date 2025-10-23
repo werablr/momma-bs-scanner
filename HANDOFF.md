@@ -7,8 +7,8 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning
-**Date:** October 21, 2025, 5:35 PM
-**Status:** 🔄 Dev Mode - Internal Testing Phase (22/50 items scanned, 44% complete)
+**Date:** October 23, 2025, 11:10 AM
+**Status:** 🔄 Dev Mode - Internal Testing Phase (23/50 items scanned, 46% complete)
 
 ---
 
@@ -18,7 +18,63 @@
 
 ---
 
-## 🚀 Latest Session: Testing Progress Update (Oct 21, 2025, 5:00-5:35 PM)
+## 🚀 Latest Session: API Fallback Implementation + Edge Function Logging (Oct 23, 2025, 10:30 AM - 11:10 AM)
+
+**Mission:** Fix sake bottle scanning failure, implement proper API fallback, set up edge function logging
+**Duration:** 40 minutes
+**Status:** ✅ **COMPLETE**
+
+### What We Accomplished
+
+#### 1. API Fallback System Implemented ✅
+**Problem:** Products not in Nutritionix (alcohol, non-food items) were failing with "Product not found" error
+**Solution:** Implemented proper fallback cascade across all three APIs
+
+**Before:**
+- Nutritionix fails → immediate error
+- UPCitemdb and Open Food Facts never called
+
+**After:**
+- Nutritionix fails → Try UPCitemdb → Try Open Food Facts → Error only if all fail
+- Successfully scanned: Sho Chiku Bai Sake 750ml using UPCitemdb data
+- Fixed cached product extraction to work with all data sources
+
+**Technical Changes:**
+- Modified edge function to attempt all APIs sequentially
+- Added product reconstruction from UPCitemdb and Open Food Facts when Nutritionix unavailable
+- Fixed cached data extraction to handle products saved from fallback APIs
+- Added Nutri-Score validation to prevent database constraint violations
+
+#### 2. Edge Function Logging System Created ✅
+**Problem:** No way to debug edge function failures without accessing Supabase dashboard
+**Solution:** Created queryable logging table with programmatic access
+
+**Implementation:**
+- Created `edge_function_logs` table with RLS policies
+- Added `dbLog()` helper function for structured logging
+- Can now query logs via Node.js script: `node check-logs.js`
+- Logs include: timestamp, log level, message, data payload, barcode
+
+**Benefits:**
+- Real-time debugging of edge function execution
+- No need to manually check Supabase dashboard
+- Structured logs with searchable metadata
+- Enabled rapid diagnosis of sake bottle scanning issue
+
+#### 3. Bug Fixes ✅
+- **Xcode Duplicate Project:** Removed `MommaBsScanner 2.xcodeproj` that was causing Metro warnings
+- **Cached Product Extraction:** Fixed null product when cache contains only UPCitemdb/OFF data
+- **Nutri-Score Validation:** Added validation to only allow 'a', 'b', 'c', 'd', 'e' grades
+
+### Impact
+- ✅ Scanner now supports alcoholic beverages and non-food items
+- ✅ 23rd item successfully scanned (Sho Chiku Bai Sake)
+- ✅ Edge function logging available for future debugging
+- ✅ Development velocity improved with better observability
+
+---
+
+## 🚀 Previous Session: Testing Progress Update (Oct 21, 2025, 5:00-5:35 PM)
 
 **Mission:** Document testing progress, identify issues, update HANDOFF files
 **Duration:** 35 minutes

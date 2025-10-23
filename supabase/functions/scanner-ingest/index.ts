@@ -6,6 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to log to database
+async function dbLog(supabaseClient: any, level: string, message: string, data: any = null, barcode: string | null = null) {
+  try {
+    console.log(`[${level.toUpperCase()}] ${message}`, data ? JSON.stringify(data).substring(0, 200) : '')
+    await supabaseClient.from('edge_function_logs').insert({
+      function_name: 'scanner-ingest',
+      log_level: level,
+      message: message,
+      data: data,
+      barcode: barcode
+    })
+  } catch (e) {
+    console.error('Failed to write to log table:', e)
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -31,13 +47,17 @@ serve(async (req) => {
 
       // STEP 1: Barcode scan with storage location
       if (step === 1) {
+        await dbLog(supabaseClient, 'info', 'Step 1: Processing barcode', { barcode, storage_location_id }, barcode)
         console.log('Step 1: Processing barcode:', barcode, 'Storage:', storage_location_id)
 
         // PRIORITY 1: Check product_catalog first (avoid API calls if cached)
+        await dbLog(supabaseClient, 'debug', 'Checking product_catalog', null, barcode)
         console.log('Checking product_catalog for barcode:', barcode)
         const { data: catalogProduct, error: catalogError } = await supabaseClient
           .rpc('get_product_from_catalog', { p_barcode: barcode })
           .single()
+
+        await dbLog(supabaseClient, 'debug', 'Catalog check complete', { found: !!catalogProduct, error: catalogError?.message }, barcode)
 
         let nutritionixData: any = null
         let upcitemdbData: any = null
@@ -48,11 +68,58 @@ serve(async (req) => {
         let sourcesPriority = 'api_fresh'
 
         if (catalogProduct && !catalogError) {
+          await dbLog(supabaseClient, 'debug', 'Using cached product data', { has_nutritionix: !!catalogProduct.nutritionix_data, has_upcitemdb: !!catalogProduct.upcitemdb_data, has_openfoodfacts: !!catalogProduct.openfoodfacts_data }, barcode)
           console.log('✓ Found in product_catalog (cached), using stored data')
           nutritionixData = catalogProduct.nutritionix_data
           upcitemdbData = catalogProduct.upcitemdb_data
           openfoodfactsData = catalogProduct.openfoodfacts_data
-          product = nutritionixData?.foods?.[0]
+
+          // Try to extract product from cached data (priority: Nutritionix > UPCitemdb > OpenFoodFacts)
+          if (nutritionixData?.foods?.[0]) {
+            product = nutritionixData.foods[0]
+          } else if (upcitemdbData?.items?.[0]) {
+            // Reconstruct product from UPCitemdb data
+            const item = upcitemdbData.items[0]
+            product = {
+              food_name: item.title || item.description || 'Unknown Product',
+              brand_name: item.brand || 'Unknown Brand',
+              serving_qty: null,
+              serving_unit: null,
+              serving_weight_grams: null,
+              nf_calories: null,
+              nf_total_fat: null,
+              nf_saturated_fat: null,
+              nf_cholesterol: null,
+              nf_sodium: null,
+              nf_total_carbohydrate: null,
+              nf_dietary_fiber: null,
+              nf_sugars: null,
+              nf_protein: null,
+              nf_potassium: null,
+            }
+          } else if (openfoodfactsData?.product?.product_name) {
+            // Reconstruct product from OpenFoodFacts data
+            const offProduct = openfoodfactsData.product
+            product = {
+              food_name: offProduct.product_name,
+              brand_name: offProduct.brands || 'Unknown Brand',
+              serving_qty: offProduct.serving_quantity ? parseFloat(offProduct.serving_quantity) : null,
+              serving_unit: offProduct.serving_quantity_unit || null,
+              serving_weight_grams: offProduct.serving_size ? parseFloat(offProduct.serving_size) : null,
+              nf_calories: offProduct.nutriments?.['energy-kcal_100g'] || null,
+              nf_total_fat: offProduct.nutriments?.fat_100g || null,
+              nf_saturated_fat: offProduct.nutriments?.['saturated-fat_100g'] || null,
+              nf_cholesterol: null,
+              nf_sodium: offProduct.nutriments?.sodium_100g ? offProduct.nutriments.sodium_100g * 1000 : null,
+              nf_total_carbohydrate: offProduct.nutriments?.carbohydrates_100g || null,
+              nf_dietary_fiber: offProduct.nutriments?.fiber_100g || null,
+              nf_sugars: offProduct.nutriments?.sugars_100g || null,
+              nf_protein: offProduct.nutriments?.proteins_100g || null,
+              nf_potassium: null,
+            }
+          }
+
+          await dbLog(supabaseClient, 'debug', 'Extracted product from cache', { has_product: !!product, product_name: product?.food_name }, barcode)
           packageSize = catalogProduct.package_size
           packageUnit = catalogProduct.package_unit
           sourcesPriority = 'catalog_cached'
@@ -67,6 +134,7 @@ serve(async (req) => {
             throw new Error('Nutritionix API credentials not configured')
           }
 
+          console.log('Trying Nutritionix API...')
           const nutritionixResponse = await fetch(
             `https://trackapi.nutritionix.com/v2/search/item?upc=${barcode}`,
             {
@@ -77,42 +145,20 @@ serve(async (req) => {
             }
           )
 
-          if (!nutritionixResponse.ok) {
-            console.error('Nutritionix API error:', await nutritionixResponse.text())
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: 'Product not found in database',
-                barcode: barcode,
-              }),
-              {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200,
-              }
-            )
+          if (nutritionixResponse.ok) {
+            nutritionixData = await nutritionixResponse.json()
+            product = nutritionixData.foods?.[0]
+            if (product) {
+              await dbLog(supabaseClient, 'info', 'Nutritionix found product', { food_name: product.food_name }, barcode)
+              console.log('✓ Nutritionix found product:', product.food_name)
+            }
+          } else {
+            await dbLog(supabaseClient, 'info', 'Nutritionix failed, trying fallback APIs', { status: nutritionixResponse.status }, barcode)
+            console.log('✗ Nutritionix failed, will try other APIs')
           }
 
-          nutritionixData = await nutritionixResponse.json()
-          product = nutritionixData.foods?.[0]
-
-          if (!product) {
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: 'Product not found',
-                barcode: barcode,
-              }),
-              {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200,
-              }
-            )
-          }
-
-          console.log('✓ Nutritionix found product:', product.food_name)
-
-          // PRIORITY 3: Call UPCitemdb API for package size & pricing
-          console.log('Calling UPCitemdb API for package data...')
+          // PRIORITY 3: Call UPCitemdb API for package size & pricing (also fallback for product data)
+          console.log('Calling UPCitemdb API...')
           try {
             const upcitemdbResponse = await fetch(
               `https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`,
@@ -126,16 +172,44 @@ serve(async (req) => {
 
             if (upcitemdbResponse.ok) {
               upcitemdbData = await upcitemdbResponse.json()
-              console.log('✓ UPCitemdb response:', JSON.stringify(upcitemdbData).substring(0, 200))
+              console.log('✓ UPCitemdb raw response:', JSON.stringify(upcitemdbData).substring(0, 300))
+              const item = upcitemdbData?.items?.[0]
 
-              // Parse package size from title (e.g., "BUSH'S Black Beans 15 oz")
-              const item = upcitemdbData.items?.[0]
-              if (item?.title) {
-                const parsed = parsePackageSizeFromTitle(item.title)
-                if (parsed) {
-                  packageSize = parsed.size
-                  packageUnit = parsed.unit
-                  console.log(`✓ Parsed package size from title: ${packageSize} ${packageUnit}`)
+              if (item && (item.title || item.description)) {
+                console.log('✓ UPCitemdb found product:', item.title || item.description)
+
+                // If Nutritionix didn't find product, use UPCitemdb data as fallback
+                if (!product) {
+                  await dbLog(supabaseClient, 'info', 'Using UPCitemdb as fallback product source', { title: item.title }, barcode)
+                  console.log('→ Using UPCitemdb as primary product source')
+                  product = {
+                    food_name: item.title || item.description || 'Unknown Product',
+                    brand_name: item.brand || 'Unknown Brand',
+                    // UPCitemdb doesn't have nutrition data, set to null
+                    serving_qty: null,
+                    serving_unit: null,
+                    serving_weight_grams: null,
+                    nf_calories: null,
+                    nf_total_fat: null,
+                    nf_saturated_fat: null,
+                    nf_cholesterol: null,
+                    nf_sodium: null,
+                    nf_total_carbohydrate: null,
+                    nf_dietary_fiber: null,
+                    nf_sugars: null,
+                    nf_protein: null,
+                    nf_potassium: null,
+                  }
+                }
+
+                // Parse package size from title (e.g., "BUSH'S Black Beans 15 oz")
+                if (item.title) {
+                  const parsed = parsePackageSizeFromTitle(item.title)
+                  if (parsed) {
+                    packageSize = parsed.size
+                    packageUnit = parsed.unit
+                    console.log(`✓ Parsed package size from title: ${packageSize} ${packageUnit}`)
+                  }
                 }
               }
             } else {
@@ -146,8 +220,8 @@ serve(async (req) => {
             // Continue without UPCitemdb data
           }
 
-          // PRIORITY 4: Call Open Food Facts API for health scores & environmental data
-          console.log('Calling Open Food Facts API for health/environmental data...')
+          // PRIORITY 4: Call Open Food Facts API for health scores & environmental data (also fallback)
+          console.log('Calling Open Food Facts API...')
           try {
             const offResponse = await fetch(
               `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`,
@@ -163,11 +237,36 @@ serve(async (req) => {
 
               if (openfoodfactsData.status === 1 && openfoodfactsData.product) {
                 console.log('✓ Open Food Facts found product')
+                const offProduct = openfoodfactsData.product
+
+                // If still no product data, use Open Food Facts as final fallback
+                if (!product && offProduct.product_name) {
+                  console.log('→ Using Open Food Facts as primary product source')
+                  product = {
+                    food_name: offProduct.product_name,
+                    brand_name: offProduct.brands || 'Unknown Brand',
+                    // Try to get serving info from OFF
+                    serving_qty: offProduct.serving_quantity ? parseFloat(offProduct.serving_quantity) : null,
+                    serving_unit: offProduct.serving_quantity_unit || null,
+                    serving_weight_grams: offProduct.serving_size ? parseFloat(offProduct.serving_size) : null,
+                    // Try to get nutrition from OFF (per 100g)
+                    nf_calories: offProduct.nutriments?.['energy-kcal_100g'] || null,
+                    nf_total_fat: offProduct.nutriments?.fat_100g || null,
+                    nf_saturated_fat: offProduct.nutriments?.['saturated-fat_100g'] || null,
+                    nf_cholesterol: null, // OFF doesn't track cholesterol
+                    nf_sodium: offProduct.nutriments?.sodium_100g ? offProduct.nutriments.sodium_100g * 1000 : null, // Convert g to mg
+                    nf_total_carbohydrate: offProduct.nutriments?.carbohydrates_100g || null,
+                    nf_dietary_fiber: offProduct.nutriments?.fiber_100g || null,
+                    nf_sugars: offProduct.nutriments?.sugars_100g || null,
+                    nf_protein: offProduct.nutriments?.proteins_100g || null,
+                    nf_potassium: null, // OFF doesn't track potassium
+                  }
+                }
 
                 // Try to get package size from Open Food Facts if not already found
-                if (!packageSize && openfoodfactsData.product.product_quantity) {
-                  const quantity = parseFloat(openfoodfactsData.product.product_quantity)
-                  const unit = openfoodfactsData.product.product_quantity_unit || 'g'
+                if (!packageSize && offProduct.product_quantity) {
+                  const quantity = parseFloat(offProduct.product_quantity)
+                  const unit = offProduct.product_quantity_unit || 'g'
                   if (!isNaN(quantity)) {
                     packageSize = quantity
                     packageUnit = unit
@@ -186,7 +285,27 @@ serve(async (req) => {
             // Continue without Open Food Facts data
           }
 
-          // Save to product_catalog for future scans
+          // Final check: Did we get product data from ANY source?
+          await dbLog(supabaseClient, 'debug', 'Final check - product state', { has_product: !!product, product_value: product }, barcode)
+          if (!product) {
+            await dbLog(supabaseClient, 'error', 'Product not found in any API', { barcode }, barcode)
+            console.error('✗ Product not found in any API (Nutritionix, UPCitemdb, Open Food Facts)')
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: 'Product not found in any database',
+                barcode: barcode,
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+              }
+            )
+          }
+
+          console.log('✓ Final product data source:', product.brand_name ? `${product.brand_name} - ${product.food_name}` : product.food_name)
+
+          // Save to product_catalog for future scans (only if product exists)
           console.log('Saving to product_catalog...')
           const { data: catalogSaveResult, error: catalogSaveError } = await supabaseClient
             .rpc('upsert_product_catalog', {
@@ -426,9 +545,18 @@ function extractOpenFoodFactsData(offData: any) {
 
   const p = offData.product
 
+  // Validate nutriscore - only allow a, b, c, d, e (lowercase)
+  let nutriscoreGrade = null
+  if (p.nutriscore_grade) {
+    const grade = p.nutriscore_grade.toLowerCase()
+    if (['a', 'b', 'c', 'd', 'e'].includes(grade)) {
+      nutriscoreGrade = grade
+    }
+  }
+
   return {
     // Health scores
-    nutriscore_grade: p.nutriscore_grade || null,
+    nutriscore_grade: nutriscoreGrade,
     nova_group: p.nova_group ? parseInt(p.nova_group) : null,
     ecoscore_grade: p.ecoscore_grade || null,
     nutrient_levels: p.nutrient_levels || null,
