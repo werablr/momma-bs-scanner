@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import scannerAPI from '../services/scannerAPI';
-import { STORAGE_LOCATIONS, FOOD_CATEGORIES } from '../utils/constants';
+import { FOOD_CATEGORIES } from '../utils/constants';
+import { supabase } from '../lib/supabase';
 
 export default function ManualEntryForm({ visible, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -32,6 +33,33 @@ export default function ManualEntryForm({ visible, onClose, onSuccess }) {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [storageLocations, setStorageLocations] = useState([]);
+
+  useEffect(() => {
+    const loadStorageLocations = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('storage_locations')
+          .select('*')
+          .order('name');
+
+        if (error) {
+          console.error('Error loading storage locations:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          setStorageLocations(data);
+        }
+      } catch (error) {
+        console.error('Failed to load storage locations:', error);
+      }
+    };
+
+    if (visible) {
+      loadStorageLocations();
+    }
+  }, [visible]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -114,7 +142,7 @@ export default function ManualEntryForm({ visible, onClose, onSuccess }) {
     }
   };
 
-  const selectedLocation = STORAGE_LOCATIONS.find(loc => loc.id === formData.storage_location_id);
+  const selectedLocation = storageLocations.find(loc => loc.id === formData.storage_location_id);
 
   return (
     <Modal
@@ -193,7 +221,7 @@ export default function ManualEntryForm({ visible, onClose, onSuccess }) {
                 onPress={() => setShowLocationPicker(true)}
               >
                 <Text style={[styles.pickerText, !selectedLocation && styles.placeholder]}>
-                  {selectedLocation ? `${selectedLocation.icon} ${selectedLocation.name}` : 'Select location'}
+                  {selectedLocation ? selectedLocation.name : 'Select location'}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#666" />
               </TouchableOpacity>
@@ -298,7 +326,7 @@ export default function ManualEntryForm({ visible, onClose, onSuccess }) {
             <View style={styles.pickerContent}>
               <Text style={styles.pickerTitle}>Select Storage Location</Text>
               <ScrollView style={styles.pickerList}>
-                {STORAGE_LOCATIONS.map((location) => (
+                {storageLocations.map((location) => (
                   <TouchableOpacity
                     key={location.id}
                     style={styles.pickerItem}
@@ -308,7 +336,7 @@ export default function ManualEntryForm({ visible, onClose, onSuccess }) {
                     }}
                   >
                     <Text style={styles.pickerItemText}>
-                      {location.icon} {location.name}
+                      {location.name}
                     </Text>
                     <Text style={styles.pickerItemSubtext}>{location.description}</Text>
                   </TouchableOpacity>

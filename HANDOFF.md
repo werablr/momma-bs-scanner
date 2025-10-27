@@ -7,8 +7,36 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning
-**Date:** October 23, 2025, 11:10 AM
-**Status:** 🔄 Dev Mode - Internal Testing Phase (23/50 items scanned, 46% complete)
+**Date:** October 27, 2025, 4:55 PM
+**Status:** 🚧 **BLOCKING ISSUE** - Manual Entry Failing
+
+---
+
+## 🚨 CURRENT BLOCKING ISSUE
+
+**Problem:** Manual entry workflow is failing with edge function error
+**Status:** IN PROGRESS - Debugging edge function
+**Impact:** Cannot add items without barcodes (e.g., fresh produce like limes)
+
+**Error:**
+```
+LOG  📝 Manual entry: {"product_name": "Lime", "storage_location_id": "...", ...}
+ERROR  ❌ Manual entry failed: [FunctionsHttpError: Edge Function returned a non-2xx status code]
+```
+
+**Changes Made:**
+1. ✅ Fixed ManualEntryForm to load storage locations from database (instead of hardcoded constants)
+2. ✅ Added manual entry workflow handler to edge function (line 490-530)
+3. ✅ Deployed updated edge function to Supabase
+4. ❌ Still returning non-2xx error - need to check edge function logs for actual error
+
+**Next Steps:**
+- Check Supabase dashboard edge function logs for actual error message
+- Debug why manual workflow is returning error despite code being deployed
+- Verify edge function is correctly parsing request body
+
+**Session Started:** October 27, 2025, 4:25 PM
+**Log File:** metro.log created for real-time debugging
 
 ---
 
@@ -18,7 +46,7 @@
 
 ---
 
-## 🚀 Latest Session: API Fallback Implementation + Edge Function Logging (Oct 23, 2025, 10:30 AM - 11:10 AM)
+## 🚀 Previous Session: API Fallback Implementation + Edge Function Logging (Oct 23, 2025, 10:30 AM - 11:10 AM)
 
 **Mission:** Fix sake bottle scanning failure, implement proper API fallback, set up edge function logging
 **Duration:** 40 minutes

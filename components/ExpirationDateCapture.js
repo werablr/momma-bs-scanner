@@ -139,6 +139,19 @@ export default function ExpirationDateCapture({ visible, onClose, onDateCaptured
     handleAcceptDate(dateString, 0, '');
   }, [selectedDate, handleAcceptDate]);
 
+  const handleClose = useCallback(() => {
+    // Treat close as skip - complete Step 2 with null expiration date
+    onDateCaptured({
+      date: null,
+      confidence: 0,
+      ocrText: 'User closed without setting expiration',
+      method: 'skipped',
+      processingTimeMs: 0
+    });
+    resetState();
+    onClose();
+  }, [onDateCaptured, onClose, resetState]);
+
   const handleSkipExpiration = useCallback(() => {
     Alert.alert(
       'Skip Expiration Date',
@@ -213,7 +226,7 @@ export default function ExpirationDateCapture({ visible, onClose, onDateCaptured
   const renderOverlay = () => (
     <View style={styles.overlay}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
           <Ionicons name="close" size={32} color="white" />
         </TouchableOpacity>
         
@@ -353,7 +366,7 @@ export default function ExpirationDateCapture({ visible, onClose, onDateCaptured
     <Modal
       visible={visible}
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.container}>
         {renderCamera()}

@@ -29,7 +29,8 @@ serve(async (req) => {
   }
 
   try {
-    const { workflow, step, barcode, storage_location_id, scan_id, ocr_text, extracted_date, confidence, processing_time_ms } = await req.json()
+    const requestBody = await req.json()
+    const { workflow, step, barcode, storage_location_id, scan_id, ocr_text, extracted_date, confidence, processing_time_ms, product_name, brand_name, category, expiration_date, notes } = requestBody
 
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -484,6 +485,47 @@ serve(async (req) => {
           }
         )
       }
+    }
+
+    // Manual entry workflow (for items without barcodes)
+    if (workflow === 'manual') {
+      await dbLog(supabaseClient, 'info', 'Manual entry', { product_name, storage_location_id }, null)
+      console.log('Manual entry:', product_name, 'Storage:', storage_location_id)
+
+      // Create inventory item with minimal data
+      const { data: inventoryItem, error: inventoryError } = await supabaseClient
+        .from('inventory_items')
+        .insert({
+          barcode: barcode || null,
+          storage_location_id: storage_location_id,
+          household_id: '7c093e13-4bcf-463e-96c1-9f499de9c4f2', // TODO: Get from user context
+          food_name: product_name,
+          brand_name: brand_name || null,
+          expiration_date: expiration_date,
+          notes: notes || null,
+          status: 'active',
+        })
+        .select()
+        .single()
+
+      if (inventoryError) {
+        console.error('Manual entry database error:', inventoryError)
+        throw inventoryError
+      }
+
+      console.log('Manual entry complete, item_id:', inventoryItem.id)
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scan_id: inventoryItem.id,
+          item: inventoryItem,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
     }
 
     // Invalid request
