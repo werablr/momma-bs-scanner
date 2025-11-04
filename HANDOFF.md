@@ -7,36 +7,40 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning
-**Date:** October 27, 2025, 4:55 PM
-**Status:** 🚧 **BLOCKING ISSUE** - Manual Entry Failing
+**Date:** November 4, 2025, 9:45 PM
+**Status:** 🚧 **ACTIVE ISSUE** - Dev Server Auto-Connection Requires EAS Build Fix
 
 ---
 
-## 🚨 CURRENT BLOCKING ISSUE
+## 🚨 CURRENT ACTIVE ISSUE
 
-**Problem:** Manual entry workflow is failing with edge function error
-**Status:** IN PROGRESS - Debugging edge function
-**Impact:** Cannot add items without barcodes (e.g., fresh produce like limes)
+**Problem:** Dev server auto-connection not working
+**Status:** IN PROGRESS - Requires EAS Build to fix properly
+**Impact:** Must manually enter Metro URL every time app launches
 
-**Error:**
-```
-LOG  📝 Manual entry: {"product_name": "Lime", "storage_location_id": "...", ...}
-ERROR  ❌ Manual entry failed: [FunctionsHttpError: Edge Function returned a non-2xx status code]
-```
+**Root Cause Analysis (Nov 4, 2025):**
+1. ❌ **Design flaw in build process** - Used local `npx expo run:ios` instead of EAS Build
+2. ❌ **CocoaPods failures** - Encoding issues, brittle, violates project philosophy
+3. ❌ **Missing iOS permissions** - `NSLocalNetworkUsageDescription` and `NSBonjourServices` added to `app.json` but not applied to build
+4. ❌ **Local prebuild failures** - CocoaPods prevents proper Info.plist generation from app.json
 
-**Changes Made:**
-1. ✅ Fixed ManualEntryForm to load storage locations from database (instead of hardcoded constants)
-2. ✅ Added manual entry workflow handler to edge function (line 490-530)
-3. ✅ Deployed updated edge function to Supabase
-4. ❌ Still returning non-2xx error - need to check edge function logs for actual error
+**Proper Fix (Following Project Philosophy):**
+1. ✅ Added Local Network permissions to `app.json` (lines 24-27)
+2. ⏳ **NEXT:** Build with EAS: `npx eas build --platform ios --profile development`
+3. ⏳ Install new build → Grant Local Network permission
+4. ⏳ Verify auto-connection works
 
-**Next Steps:**
-- Check Supabase dashboard edge function logs for actual error message
-- Debug why manual workflow is returning error despite code being deployed
-- Verify edge function is correctly parsing request body
+**Why Local Builds Failed:**
+- CocoaPods has persistent encoding issues on this Mac
+- `npx expo prebuild --clean` failed with Unicode normalization errors
+- Local builds violate project philosophy: "Stability over ease - no npx, no temporary fixes"
+- EAS Build is the proper, stable approach
 
-**Session Started:** October 27, 2025, 4:25 PM
-**Log File:** metro.log created for real-time debugging
+**Temporary Workaround:**
+- Start Metro: `npx expo start --dev-client`
+- Manually enter URL: `192.168.0.211:8081`
+
+**Session Started:** November 4, 2025, 9:00 PM
 
 ---
 
@@ -912,23 +916,60 @@ created_at            TIMESTAMP
 
 ## 🚀 Deployment Commands
 
-### Rebuild Mobile App (Full Native Rebuild)
-```bash
-cd /Users/macmini/Desktop/scanner
-npx expo run:ios --device "00008110-001645D13C47801E"
-```
-**Note:** Only needed when changing native code (ML Kit, camera, etc.). Takes 2-3 minutes.
+### ⚠️ IMPORTANT: Build Process Philosophy
 
-### Start Metro Bundler (JavaScript Hot Reload)
+**NEVER use local iOS builds (`npx expo run:ios`).** This approach:
+- Requires CocoaPods (brittle, slow, encoding issues)
+- Violates project philosophy: "Stability over ease"
+- Creates tech debt and maintenance burden
+- Fails frequently on this Mac due to encoding issues
+
+**ALWAYS use EAS Build for native changes.** This is the proper approach:
+- Cloud-based builds (Expo handles CocoaPods complexity)
+- Stable and reliable
+- No local CocoaPods issues
+- Follows project philosophy: "Completeness over convenience"
+
+---
+
+### Rebuild Mobile App (Native Code Changes Only)
+
+**When you need a native rebuild:**
+- Adding/updating native modules
+- Changing Info.plist (permissions, config)
+- Updating iOS entitlements
+
+**PROPER METHOD - EAS Build (Cloud):**
 ```bash
-npx expo start
-# Then connect app to: http://192.168.0.211:8081
+cd /Users/macmini/Desktop/momma-bs-scanner
+npx eas build --platform ios --profile development
+# Downloads .ipa → Install to device via Xcode or ad-hoc
 ```
-**Note:** Use this for JavaScript-only changes. Instant reload.
+
+**DO NOT USE - Local Build (Deprecated):**
+```bash
+# ❌ NEVER RUN THIS - CocoaPods will fail
+# npx expo run:ios --device "00008110-001645D13C47801E"
+```
+
+---
+
+### Start Metro Bundler (JavaScript Changes - Day-to-Day Development)
+```bash
+cd /Users/macmini/Desktop/momma-bs-scanner
+npx expo start --dev-client
+```
+**Note:**
+- Use this for ALL JavaScript-only changes (99% of development)
+- App auto-connects to Metro at `http://192.168.0.211:8081`
+- Instant hot reload
+- No rebuild needed
+
+---
 
 ### Deploy Edge Function
 ```bash
-cd /Users/macmini/Desktop/scanner
+cd /Users/macmini/Desktop/momma-bs-scanner
 supabase functions deploy scanner-ingest
 ```
 
@@ -966,12 +1007,28 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 **Expected Behavior:** This is a known limitation of OCR on embossed metal
 **User Action:** User taps "Enter Manually" and uses date picker - works perfectly!
 
-### Metro Bundler Won't Connect
-**Symptom:** App shows "No development servers found"
-**Fix:**
-1. Start Metro: `npx expo start`
+### Metro Bundler Won't Auto-Connect
+**Symptom:** App shows "No development servers found" on launch
+**Root Cause:** Missing iOS Local Network permissions in development build
+**Status:** ⚠️ ACTIVE ISSUE - Requires EAS Build to fix properly
+
+**Proper Fix:**
+1. Verify `app.json` has Local Network permissions (already added):
+   - `NSLocalNetworkUsageDescription`
+   - `NSBonjourServices: ["_expodev._tcp"]`
+2. Build with EAS: `npx eas build --platform ios --profile development`
+3. Install new build - iOS will prompt for Local Network permission
+4. Grant permission - app will now auto-discover Metro
+
+**Temporary Workaround (until proper fix):**
+1. Start Metro: `npx expo start --dev-client`
 2. In app, tap "Enter URL manually"
 3. Enter: `192.168.0.211:8081`
+
+**Why This Happened:**
+- Local builds with `npx expo run:ios` failed to apply permissions from `app.json`
+- CocoaPods prebuild issues prevented proper Info.plist generation
+- EAS Build handles this correctly in cloud environment
 
 ### Brand or Storage Location Shows Wrong
 **Symptom:** Brand empty or storage showing "undefined"

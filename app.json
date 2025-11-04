@@ -21,6 +21,10 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to scan product barcodes for nutrition tracking.",
         "NSPhotoLibraryUsageDescription": "This app may access your photo library to scan barcodes from images.",
+        "NSLocalNetworkUsageDescription": "This app requires local network access to connect to the development server for live updates during development.",
+        "NSBonjourServices": [
+          "_expodev._tcp"
+        ],
         "UIBackgroundModes": [
           "background-processing"
         ],
@@ -61,9 +65,12 @@
     "experiments": {
       "typedRoutes": true
     },
+    "packagerOpts": {
+      "hostType": "lan"
+    },
     "extra": {
       "eas": {
-        "projectId": "d0a1ece4-5fa9-4c64-97e7-d3efcd577ab7"
+        "projectId": "3c40b3e9-0142-4e8f-bfc6-e0906a39e52e"
       },
       "router": {}
     },
