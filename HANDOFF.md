@@ -7,40 +7,50 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning
-**Date:** November 4, 2025, 9:45 PM
-**Status:** 🚧 **ACTIVE ISSUE** - Dev Server Auto-Connection Requires EAS Build Fix
+**Date:** November 5, 2025, 4:30 PM
+**Status:** 🚧 **ACTIVE ISSUE** - Configuring TestFlight Distribution
 
 ---
 
 ## 🚨 CURRENT ACTIVE ISSUE
 
-**Problem:** Dev server auto-connection not working
-**Status:** IN PROGRESS - Requires EAS Build to fix properly
-**Impact:** Must manually enter Metro URL every time app launches
+**Problem:** Setting up proper TestFlight distribution for development builds
+**Status:** IN PROGRESS - Configuring EAS Build for TestFlight
+**Impact:** No working development build installed on device
 
-**Root Cause Analysis (Nov 4, 2025):**
-1. ❌ **Design flaw in build process** - Used local `npx expo run:ios` instead of EAS Build
-2. ❌ **CocoaPods failures** - Encoding issues, brittle, violates project philosophy
-3. ❌ **Missing iOS permissions** - `NSLocalNetworkUsageDescription` and `NSBonjourServices` added to `app.json` but not applied to build
-4. ❌ **Local prebuild failures** - CocoaPods prevents proper Info.plist generation from app.json
+**Session History (Nov 5, 2025):**
+1. ✅ **App Store Connect configured** - App ID: 6754896169
+2. ✅ **First EAS build attempted** - Failed after 45+ minutes (timeout)
+   - Root cause: Pre-existing `ios/` and `android/` directories from local builds
+   - Solution: Removed native directories, backed up as `.backup`
+3. ✅ **Second EAS build completed** - 7 minutes, build ID: `bfa64e38-950f-486d-bb66-833a9dba2416`
+   - Used Ad Hoc distribution (internal)
+   - Installation failed - device not properly provisioned
+4. ⏳ **CURRENT:** Configuring TestFlight distribution (proper approach)
+   - Need to change `eas.json` from internal to store distribution
+   - Requires App Store Connect metadata completion
+   - Need TestFlight app on iPhone
+   - Need internal tester setup
 
-**Proper Fix (Following Project Philosophy):**
-1. ✅ Added Local Network permissions to `app.json` (lines 24-27)
-2. ⏳ **NEXT:** Build with EAS: `npx eas build --platform ios --profile development`
-3. ⏳ Install new build → Grant Local Network permission
-4. ⏳ Verify auto-connection works
+**Critical Lessons Learned:**
+- ❌ **MISTAKE:** Built with Ad Hoc without verifying device provisioning first
+- ❌ **MISTAKE:** Did not discuss distribution strategy before building
+- ✅ **CORRECT APPROACH:** TestFlight for long-term, professional distribution
+- ✅ **PHILOSOPHY:** "Accuracy over speed" - should have configured properly FIRST
 
-**Why Local Builds Failed:**
-- CocoaPods has persistent encoding issues on this Mac
-- `npx expo prebuild --clean` failed with Unicode normalization errors
-- Local builds violate project philosophy: "Stability over ease - no npx, no temporary fixes"
-- EAS Build is the proper, stable approach
+**Why TestFlight is the Right Choice:**
+- No device UDID management required
+- Works on any device added to TestFlight
+- Professional distribution path (matches production workflow)
+- Aligns with project philosophy: "Proper solutions, not workarounds"
+- Future-proof: get new phone, just login to TestFlight
 
-**Temporary Workaround:**
-- Start Metro: `npx expo start --dev-client`
-- Manually enter URL: `192.168.0.211:8081`
+**Previous Issue (Nov 4, 2025) - RESOLVED:**
+- Dev server auto-connection not working
+- Root cause: Local builds didn't apply `NSLocalNetworkUsageDescription` permissions
+- Solution: EAS Build with proper permissions in `app.json`
 
-**Session Started:** November 4, 2025, 9:00 PM
+**Session Started:** November 5, 2025, 4:00 PM
 
 ---
 
@@ -939,12 +949,39 @@ created_at            TIMESTAMP
 - Changing Info.plist (permissions, config)
 - Updating iOS entitlements
 
-**PROPER METHOD - EAS Build (Cloud):**
+**PROPER METHOD - EAS Build for TestFlight (RECOMMENDED):**
 ```bash
 cd /Users/macmini/Desktop/momma-bs-scanner
-npx eas build --platform ios --profile development
-# Downloads .ipa → Install to device via Xcode or ad-hoc
+eas build --platform ios --profile development
+# Uploads to TestFlight automatically if configured
+# Install via TestFlight app on iPhone
 ```
+
+**Prerequisites for TestFlight Distribution:**
+1. ✅ App Store Connect app record created (App ID: 6754896169)
+2. ⏳ `eas.json` configured with `"distribution": "store"` (not "internal")
+3. ⏳ App Store Connect metadata complete (REQUIRED BEFORE BUILD):
+   - **Privacy policy URL** - Must be live URL or placeholder
+   - **App description** - At least 1-2 sentences
+   - **Age rating** - Select appropriate rating
+   - **Category** - Primary category selection
+4. ⏳ TestFlight app installed on target iPhone (download from App Store)
+5. ⏳ Developer added as internal tester in App Store Connect:
+   - Go to TestFlight tab → Internal Testing
+   - Add Apple ID email as tester
+6. ⏳ **Apple ID email confirmed** - What email receives TestFlight invites?
+
+**CRITICAL: Answer these questions BEFORE building:**
+- [ ] Privacy policy URL: Do you have one or need placeholder?
+- [ ] Apple ID email: What email is your developer account under?
+- [ ] TestFlight app: Already installed on iPhone? (Yes/No)
+- [ ] App Store Connect description: Already filled in? (Yes/No)
+
+**Why TestFlight over Ad Hoc:**
+- No device UDID management
+- Works on any device (get new phone = just login)
+- Professional workflow (matches production)
+- Follows project philosophy: proper, long-term solution
 
 **DO NOT USE - Local Build (Deprecated):**
 ```bash
