@@ -26,17 +26,23 @@
 3. ✅ **Second EAS build completed** - 7 minutes, build ID: `bfa64e38-950f-486d-bb66-833a9dba2416`
    - Used Ad Hoc distribution (internal)
    - Installation failed - device not properly provisioned
-4. ⏳ **CURRENT:** Configuring TestFlight distribution (proper approach)
-   - Need to change `eas.json` from internal to store distribution
-   - Requires App Store Connect metadata completion
-   - Need TestFlight app on iPhone
-   - Need internal tester setup
+4. ⏳ **CURRENT (Nov 6, 2025):** Configuring TestFlight distribution (proper approach)
+   - ✅ GitHub repo created: https://github.com/werablr/momma-bs-scanner
+   - ✅ Privacy policy created: PRIVACY_POLICY.md
+   - ⏳ Need to enable GitHub Pages for privacy policy hosting
+   - ⏳ Need to change `eas.json` from internal to store distribution
+   - ⏳ Requires App Store Connect metadata completion
+   - ⏳ Need TestFlight app on iPhone
+   - ⏳ Need internal tester setup
 
 **Critical Lessons Learned:**
 - ❌ **MISTAKE:** Built with Ad Hoc without verifying device provisioning first
 - ❌ **MISTAKE:** Did not discuss distribution strategy before building
+- ❌ **MISTAKE (Nov 6):** Executed destructive git commands (`git rm -rf .`) without explanation or confirmation
+- ❌ **MISTAKE (Nov 6):** Attempted GitHub Pages setup without asking user's preferred hosting approach
 - ✅ **CORRECT APPROACH:** TestFlight for long-term, professional distribution
 - ✅ **PHILOSOPHY:** "Accuracy over speed" - should have configured properly FIRST
+- ✅ **PHILOSOPHY:** "Discussion over assumption" - MUST ask before acting
 
 **Why TestFlight is the Right Choice:**
 - No device UDID management required
@@ -1458,6 +1464,72 @@ Confirmation UI (always shown):
 4. **Admin UI:** Manage storage locations (add/edit/delete)
 5. **Multi-household:** Support multiple households per user
 6. **Barcode Database:** Build custom database for products not in Nutritionix
+
+---
+
+## 🤖 Working with Claude on This Project
+
+### Critical Rules for AI Assistants
+
+**BEFORE executing any command, you MUST:**
+1. **Explain what the command does** in plain language
+2. **Show the exact command** you plan to run
+3. **Explain the potential risks** (especially for destructive operations)
+4. **Wait for explicit user confirmation** before executing
+
+**NEVER execute these commands without user approval:**
+- `git rm` (deletes files from git)
+- `git reset --hard` (destroys uncommitted changes)
+- `git clean` (deletes untracked files)
+- `git push --force` (rewrites remote history)
+- `rm -rf` (deletes files permanently)
+- `npm install` or `npm uninstall` (modifies dependencies)
+- `eas build` (triggers expensive cloud builds)
+- Any command that modifies `package.json`, `app.json`, `eas.json`
+
+**Project Philosophy Enforcement:**
+- ✅ **Accuracy over speed** - Never rush, always understand before acting
+- ✅ **Discussion over assumption** - Ask questions, present options, wait for decisions
+- ✅ **Completeness over convenience** - Proper solutions, not quick workarounds
+- ✅ **Stability over ease** - Long-term maintainability over short-term convenience
+
+**When User Says "Do X":**
+1. **Don't immediately execute** - First discuss the approach
+2. **Present options** with trade-offs
+3. **Ask clarifying questions** if requirements are unclear
+4. **Propose a plan** and get approval before starting
+5. **Execute incrementally** - Show progress, don't batch everything
+
+**Example: Good vs Bad Behavior**
+
+❌ **BAD:**
+```
+User: "Set up GitHub Pages"
+Claude: *immediately runs git commands without explanation*
+```
+
+✅ **GOOD:**
+```
+User: "Set up GitHub Pages"
+Claude: "I can set up GitHub Pages in two ways:
+Option A: Manual setup (30 seconds in browser)
+Option B: Automated via gh-pages branch (requires git commands)
+
+Which do you prefer? If Option B, I'll explain exactly what commands
+I'll run before executing."
+```
+
+**Git Command Safety:**
+- Always run `git status` before any git operation
+- Never assume working directory is clean
+- Show diff before committing
+- Explain what each flag does (`-f`, `--hard`, `--force`, etc.)
+
+**Deployment Safety:**
+- EAS builds cost money and time - never trigger without confirmation
+- Always show `eas.json` changes before building
+- Confirm distribution type (development, preview, production)
+- Verify build configuration before submitting
 
 ---
 
