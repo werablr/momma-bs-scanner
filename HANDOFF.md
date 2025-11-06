@@ -720,18 +720,19 @@ scanner/
 ## 🔐 Environment Variables
 
 ### Client-Side (.env)
+**Note:** All credentials stored in 1Password. See `.env.example` for required variables.
 ```bash
-EXPO_PUBLIC_SUPABASE_URL=https://bwglyyfcdjzvvjdxxjmk.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-EXPO_PUBLIC_NUTRITIONIX_APP_ID=f4d58212
-EXPO_PUBLIC_NUTRITIONIX_API_KEY=c4aef73c1d82155043c4f3a6f2b9185a
+EXPO_PUBLIC_SUPABASE_URL=<stored_in_1password>
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<stored_in_1password>
+EXPO_PUBLIC_NUTRITIONIX_APP_ID=<stored_in_1password>
+EXPO_PUBLIC_NUTRITIONIX_API_KEY=<stored_in_1password>
 ```
 
 ### Server-Side (Supabase Secrets)
-Set via: `supabase secrets set`
+Set via: `supabase secrets set` (credentials stored in 1Password)
 ```bash
-NUTRITIONIX_APP_ID=f4d58212
-NUTRITIONIX_API_KEY=c4aef73c1d82155043c4f3a6f2b9185a
+NUTRITIONIX_APP_ID=<stored_in_1password>
+NUTRITIONIX_API_KEY=<stored_in_1password>
 ```
 
 ---

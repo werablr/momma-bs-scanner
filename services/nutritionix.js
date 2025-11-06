@@ -1,7 +1,16 @@
 // services/nutritionix.js
 
-const NUTRITIONIX_APP_ID = process.env.EXPO_PUBLIC_NUTRITIONIX_APP_ID || 'f4d58212';
-const NUTRITIONIX_APP_KEY = process.env.EXPO_PUBLIC_NUTRITIONIX_APP_KEY || 'c4aef73c1d82155043c4f3a6f2b9185a';
+// Nutritionix API credentials - stored in .env (see .env.example for setup)
+// No fallbacks - app will fail if .env is not configured properly
+if (!process.env.EXPO_PUBLIC_NUTRITIONIX_APP_ID) {
+  throw new Error('EXPO_PUBLIC_NUTRITIONIX_APP_ID is not defined in .env');
+}
+if (!process.env.EXPO_PUBLIC_NUTRITIONIX_APP_KEY) {
+  throw new Error('EXPO_PUBLIC_NUTRITIONIX_APP_KEY is not defined in .env');
+}
+
+const NUTRITIONIX_APP_ID = process.env.EXPO_PUBLIC_NUTRITIONIX_APP_ID;
+const NUTRITIONIX_APP_KEY = process.env.EXPO_PUBLIC_NUTRITIONIX_APP_KEY;
 const NUTRITIONIX_BASE_URL = 'https://trackapi.nutritionix.com/v2';
 
 // API Status and Configuration

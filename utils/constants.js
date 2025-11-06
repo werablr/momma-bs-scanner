@@ -7,9 +7,17 @@ export const STORAGE_LOCATIONS = [
   { id: 6, name: "Above Refrigerator Cabinet", icon: "🏠" }
 ];
 
-// Use environment variables with fallbacks - Updated for enhanced schema project
-export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://bwglyyfcdjzvvjdxxjmk.supabase.co';
-export const SUPABASE_FUNCTION_URL = process.env.EXPO_PUBLIC_SUPABASE_FUNCTION_URL || 'https://bwglyyfcdjzvvjdxxjmk.functions.supabase.co';
+// Use environment variables - credentials stored in .env (see .env.example for setup)
+// No fallbacks - app will fail if .env is not configured properly
+if (!process.env.EXPO_PUBLIC_SUPABASE_URL) {
+  throw new Error('EXPO_PUBLIC_SUPABASE_URL is not defined in .env');
+}
+if (!process.env.EXPO_PUBLIC_SUPABASE_FUNCTION_URL) {
+  throw new Error('EXPO_PUBLIC_SUPABASE_FUNCTION_URL is not defined in .env');
+}
+
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+export const SUPABASE_FUNCTION_URL = process.env.EXPO_PUBLIC_SUPABASE_FUNCTION_URL;
 
 // Edge Function URLs using the new format
 export const EDGE_FUNCTION_URL = `${SUPABASE_FUNCTION_URL}/scanner-ingest`;

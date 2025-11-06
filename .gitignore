@@ -35,6 +35,9 @@ web-build/
 .env.local
 .env.*.local
 
+# Supabase
+supabase/.temp/
+
 # Debug
 logs/
 *.log
