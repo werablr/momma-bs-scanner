@@ -7,8 +7,99 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning
-**Date:** November 6, 2025, 5:30 PM
-**Status:** ✅ **READY FOR BUILD** - TestFlight Distribution Configured
+**Date:** November 7, 2025
+**Status:** 🔄 **API MIGRATION IN PROGRESS** - Replacing Nutritionix with Multi-Source Strategy
+
+---
+
+## 🔄 CRITICAL UPDATE: Multi-Source Data Strategy (Nov 7, 2025)
+
+**Issue:** Nutritionix subscription expired, $499/month paid tier required
+
+**Solution:** Multi-source free API strategy with complete data provenance
+
+### New API Architecture (Replacing Nutritionix)
+
+**Philosophy: Capture Everything, Show the Best**
+
+Instead of relying on one API, we now aggregate data from **all free sources** and track provenance:
+
+```
+PRIORITY 1: Check product_catalog (cached data - skip APIs)
+
+PRIORITY 2: USDA FoodData Central ✅ NEW!
+   └─> FREE - 1,000 requests/hour
+   └─> Government nutrition data (highest quality)
+   └─> Branded foods by UPC/GTIN
+   └─> API: https://api.nal.usda.gov/fdc/v1/foods/search
+
+PRIORITY 3: UPCitemdb (existing)
+   └─> FREE - 100 requests/day
+   └─> Product names, brands, package sizes
+   └─> Pricing data
+
+PRIORITY 4: Open Food Facts (existing)
+   └─> FREE - UNLIMITED
+   └─> Health scores (Nutri-Score, NOVA)
+   └─> Photos, environmental data
+   └─> Dietary flags (vegan, vegetarian)
+
+PRIORITY 5: Manual entry fallback
+```
+
+### Database Schema: Multi-Source Columns
+
+**Design Principle:** Never assume one source is always correct. Store ALL data, let application logic choose best value.
+
+**Schema Structure (per nutrient):**
+```sql
+-- Source-specific columns (track provenance)
+usda_calories DECIMAL,
+off_calories DECIMAL,
+upc_calories DECIMAL,
+
+-- Single Source of Truth (displayed value)
+nf_calories DECIMAL  -- Auto-selected: COALESCE(usda, off, upc)
+```
+
+**Benefits:**
+- ✅ **Data provenance** - Know which API provided what
+- ✅ **Quality comparison** - See discrepancies between sources
+- ✅ **User override** - Let user pick trusted source per product
+- ✅ **Analytics potential** - "Which API is most complete for X category?"
+- ✅ **Future-proof** - Add new sources = just add columns
+- ✅ **No data loss** - All sources preserved forever
+
+**Migration Strategy:**
+- Add columns: `usda_*`, `off_*` for all nutrients
+- Keep existing `nf_*` columns as SSoT (backward compatible)
+- Raw API responses: `usda_raw_data JSONB`, etc. (debugging)
+
+**Why Columns vs JSONB:**
+- Simple SQL queries: `WHERE nf_calories > 100`
+- Type safety: Database enforces DECIMAL
+- Easy indexing for performance
+- Clear schema: Know exactly what data exists
+- No special syntax needed
+- 40-50 columns is not a problem for modern databases
+
+### What Changed from Nutritionix
+
+**Lost:**
+- `nix_brand_id`, `nix_item_id` (just IDs, not essential)
+
+**Gained:**
+- USDA government data (higher quality)
+- Unlimited API calls (Open Food Facts)
+- Multiple photos (USDA + OFF)
+- Complete transparency (know source of each field)
+- $499/month savings
+
+**Same Quality or Better:**
+- Nutrition facts: USDA matches or exceeds Nutritionix
+- Photos: Open Food Facts has extensive image database
+- Brand/product names: UPCitemdb provides
+- Package sizes: UPCitemdb title parsing (already implemented)
 
 ---
 
@@ -1099,67 +1190,85 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 
 ---
 
-## 🔄 Triple API Strategy for Maximum Product Data (Oct 18, 2025, 4:15 PM)
+## 🔄 Quad API Strategy for Maximum Product Data (Nov 7, 2025 - UPDATED)
 
-### The Problem: Missing Package Size Data
+### Evolution: From Nutritionix to Multi-Source Free APIs
 
-**Issue Discovered:**
-After successful scan test with Bush's Black Beans (15 oz can, 3 servings), we found critical data missing:
-- ✅ Nutritionix provides: Nutrition facts, serving size (0.5 cup, 130g)
-- ❌ Nutritionix does NOT provide: Package size (15 oz), servings per container (3)
+**Original (Oct 2025):** Triple API (Nutritionix + UPCitemdb + Open Food Facts)
+**Updated (Nov 2025):** Quad API (USDA + UPCitemdb + Open Food Facts + Manual)
 
-**Why This Matters:**
-- Hundreds of different package sizes in inventory (cans, bottles, spices, etc.)
-- Need to track volume for usage alerts ("running low")
-- Can't calculate total nutrients without knowing container size
-- Important for shopping lists and reorder predictions
-- Future analytics require health scores, environmental data, pricing history
+**Why the Change:**
+- Nutritionix subscription expired ($499/month paid tier required)
+- Free tier not sufficient for production use
+- USDA FoodData Central provides equal or better government data
+- Multi-source approach improves data quality and resilience
 
-### The Solution: Triple API Strategy (UPGRADED!)
+### The Solution: Quad API Strategy with Data Provenance
 
-**Decision:** Combine THREE data sources for maximum product intelligence
+**Decision:** Capture data from ALL free sources, store separately, choose best value per field
 
 **Architecture:**
 ```
 Barcode Scan Flow:
-1. Call Nutritionix API → Nutrition facts (calories, fat, protein, etc.)
-2. Call UPCitemdb API → Package data (size, weight, dimensions) + Pricing
-3. Call Open Food Facts API → Health scores, environmental data, dietary tags
-4. Merge all three datasets → Complete product record
-5. Fallback: Manual entry if any API fails
+1. Check product_catalog → Skip APIs if cached (FAST)
+2. Call USDA FoodData Central → Government nutrition data
+3. Call UPCitemdb API → Package data (size, weight, dimensions) + Pricing
+4. Call Open Food Facts API → Health scores, environmental data, dietary tags
+5. Store ALL sources separately → Enable comparison and override
+6. Select best value per field → Display in UI
+7. Fallback: Manual entry if all APIs fail
 ```
 
-**Why Triple API?**
+**Why Quad API?**
 
-**Nutritionix (36 fields)** - Already integrated
-- ✅ Best-in-class nutrition data
-- ✅ Per-serving nutrition facts
-- ✅ Free tier available
+**USDA FoodData Central** - ✅ NEW! (Replacing Nutritionix)
+- ✅ FREE - 1,000 requests/hour
+- ✅ Government nutrition data (highest quality)
+- ✅ Branded foods database (UPC/GTIN lookup)
+- ✅ Public domain data (CC0 license)
+- ✅ Comprehensive nutrient profiles
+- ✅ API: `https://api.nal.usda.gov/fdc/v1/foods/search?query={barcode}`
 
-**UPCitemdb (18 fields)** - New integration
+**UPCitemdb (18 fields)** - Existing
 - ✅ 495 million products
 - ✅ FREE tier: 100 requests/day
-- ✅ Package size (in title: "15 oz")
+- ✅ Package size (parsed from title: "15 oz")
 - ✅ Pricing history & current offers
 - ✅ Physical dimensions
 - ✅ Amazon ASIN
 
-**Open Food Facts (227 fields!)** - New integration
+**Open Food Facts (227 fields!)** - Existing
+- ✅ UNLIMITED free tier
 - ✅ Nutri-Score grade (A-E health rating)
 - ✅ NOVA group (1-4 processing level)
 - ✅ Eco-Score (environmental impact)
 - ✅ Dietary tags (vegan, vegetarian, palm-oil-free)
 - ✅ Allergen information
-- ✅ Labels & certifications
+- ✅ Product photos (extensive image database)
 - ✅ Packaging type & recyclability
 - ✅ Country of origin
-- ✅ UNLIMITED free tier
 
-**Data Completeness:**
-- **Nutritionix:** nf_calories, nf_protein, nf_fat, serving_qty, serving_unit, serving_weight_grams, full_nutrients
-- **UPCitemdb:** package_size, package_unit, weight, dimensions, pricing, ASIN, offers
-- **Open Food Facts:** nutriscore_grade, nova_group, ecoscore_grade, is_vegan, allergens, packaging_type, origins
-- **Manual/Calculated:** servings_per_container (can calculate: package_size ÷ serving_size)
+**Data Storage Strategy (Multi-Source Columns):**
+```sql
+-- Example: Calories from each source
+usda_calories DECIMAL,        -- Government data
+off_calories DECIMAL,         -- Community data
+upc_calories DECIMAL,         -- Commercial data (if available)
+
+-- Single Source of Truth (displayed)
+nf_calories DECIMAL           -- Auto-selected best value
+
+-- Raw API responses (debugging)
+usda_raw_data JSONB
+openfoodfacts_raw_data JSONB
+upcitemdb_raw_data JSONB
+```
+
+**Smart Selection Logic:**
+```javascript
+// Prefer government > community > commercial
+nf_calories = usda_calories ?? off_calories ?? upc_calories ?? null
+```
 
 ### Package Size Challenge & Solution
 
