@@ -83,6 +83,45 @@ nf_calories DECIMAL  -- Auto-selected: COALESCE(usda, off, upc)
 - No special syntax needed
 - 40-50 columns is not a problem for modern databases
 
+### Data Selection Philosophy (Nov 7, 2025)
+
+**CRITICAL DECISION:** All API sources are equal - no hierarchy, no "better" source
+
+**Data Sources (4 total):**
+1. **User Input** (user_* columns) - Manual entry/corrections during scanning
+2. **USDA FoodData Central** (usda_* columns) - Government nutrition data
+3. **Open Food Facts** (off_* columns) - Community-sourced data
+4. **UPCitemdb** (upc_* columns) - Commercial product database
+
+**API Call Order:**
+- USDA → UPCitemdb → Open Food Facts (sequential for rate limiting)
+- User input collected during scanning workflow (manual entry/corrections)
+
+**Data Storage:**
+- ALL sources stored separately (user_*, usda_*, off_*, upc_*)
+- 100% complete data provenance
+- Timestamp tracking for user corrections (`user_verified_at`)
+
+**Display Value Selection (`nf_*` fields):**
+- **Current Strategy:** Use first available value (USER → USDA → OFF → UPC order)
+  - **USER input = ALWAYS highest priority** (they looked at the label!)
+  - API order is NOT a quality hierarchy, just pragmatic "use what we got first"
+  - Temporary until we have real data to analyze
+- **Future Strategy:** TBD after 20-50 scans
+  - Will analyze which API has best coverage/accuracy per category
+  - Options being considered:
+    - Average all available sources?
+    - Weighted average based on observed accuracy?
+    - Per-nutrient logic (e.g., government data for macros, community data for allergens)?
+    - User choice per item in Pantry app?
+  - Easy to change - just update `selectBestNutrition()` function
+
+**Why This Matters:**
+- We're not picking a "winner" API - we're collecting ALL the data first
+- User knows best when they correct something (highest trust)
+- Real-world testing will reveal which API sources are most reliable
+- Philosophy: "Store everything, decide later with evidence"
+
 ### What Changed from Nutritionix
 
 **Lost:**
