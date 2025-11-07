@@ -14,6 +14,10 @@ ALTER TABLE product_catalog
 -- UPDATE RPC FUNCTIONS
 -- ============================================================================
 
+-- Drop existing functions to allow signature changes
+DROP FUNCTION IF EXISTS get_product_from_catalog(TEXT);
+DROP FUNCTION IF EXISTS upsert_product_catalog(TEXT, DECIMAL, TEXT, BOOLEAN, TEXT, JSONB, TEXT, TEXT, JSONB, JSONB, JSONB);
+
 -- Update upsert_product_catalog function to accept usda_data
 CREATE OR REPLACE FUNCTION upsert_product_catalog(
     p_barcode TEXT,
