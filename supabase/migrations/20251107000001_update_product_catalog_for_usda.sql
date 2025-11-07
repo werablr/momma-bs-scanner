@@ -1,6 +1,18 @@
--- Migration: Update product_catalog functions to support USDA data
+-- Migration: Update product_catalog for USDA FoodData Central
 -- Date: November 7, 2025
--- Purpose: Add usda_data parameter to RPC functions for USDA API integration
+-- Purpose: Add USDA columns and update RPC functions
+
+-- ============================================================================
+-- ADD USDA COLUMNS TO PRODUCT_CATALOG
+-- ============================================================================
+
+ALTER TABLE product_catalog
+  ADD COLUMN IF NOT EXISTS usda_data JSONB,
+  ADD COLUMN IF NOT EXISTS usda_fdc_id INTEGER;
+
+-- ============================================================================
+-- UPDATE RPC FUNCTIONS
+-- ============================================================================
 
 -- Update upsert_product_catalog function to accept usda_data
 CREATE OR REPLACE FUNCTION upsert_product_catalog(
@@ -113,10 +125,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Update comments
-COMMENT ON COLUMN public.product_catalog.nutritionix_data IS 'DEPRECATED: Nutritionix subscription expired Nov 2025. Full cached Nutritionix API response (kept for historical data)';
-COMMENT ON COLUMN public.product_catalog.usda_data IS 'Full cached USDA FoodData Central API response';
-COMMENT ON COLUMN public.product_catalog.usda_fdc_id IS 'USDA Food Data Central ID for direct lookups';
+-- ============================================================================
+-- UPDATE COMMENTS
+-- ============================================================================
 
-COMMENT ON FUNCTION upsert_product_catalog IS 'Insert or update product catalog entry with multi-source API data (USDA, UPC, OFF) and user verification tracking';
+COMMENT ON COLUMN product_catalog.nutritionix_data IS 'DEPRECATED: Nutritionix subscription expired Nov 2025. Kept for historical data only.';
+COMMENT ON COLUMN product_catalog.usda_data IS 'Cached USDA FoodData Central API response';
+COMMENT ON COLUMN product_catalog.usda_fdc_id IS 'USDA Food Data Central ID for direct lookups';
+
+COMMENT ON FUNCTION upsert_product_catalog IS 'Insert or update product catalog entry with multi-source API data (USDA, UPC, OFF)';
 COMMENT ON FUNCTION get_product_from_catalog IS 'Get product from catalog including all API sources and update last_seen timestamp';
