@@ -111,17 +111,17 @@ nf_calories DECIMAL  -- Auto-selected: COALESCE(usda, off, upc)
 
 ---
 
-## 🔗 UPC Alias System & Fuzzy Matching (Nov 9, 2025)
+## 🔗 USDA Fuzzy Matching & Validation System (Nov 9, 2025)
 
-**Problem:** API databases use different UPCs for the same product (regional variants, repackaging, size changes)
+**Problem:** USDA has limited exact UPC coverage (~0% match rate), but valuable micronutrient data (Calcium, Iron, Potassium)
 
 **Real-World Example:**
 - Scan UPC `0039400018834` (Bush's Black Beans 15oz)
 - USDA has no exact match for this UPC
-- USDA **does** have UPC `0039400018957` (Bush's Black Beans different size)
+- USDA **does** have UPC `00039400018803` (Bush's Black Beans, different variant)
 - Nutrition data is nearly identical → Should we discard USDA data? NO!
 
-**Solution: Probabilistic Data Capture with Deferred Validation**
+**Solution: Fuzzy Name Matching + Learning System**
 
 ### Core Principle: "Capture Everything, Even Uncertain Matches"
 
@@ -135,59 +135,121 @@ Exact barcode match fails → Discard API data → Move to next API
 Exact barcode match fails → Name-based fuzzy search → Capture top 3 matches with metadata → Flag for user verification → Learn from corrections
 ```
 
-### Fuzzy Matching Strategy (PLANNED - Nov 9, 2025)
+### Fuzzy Matching Strategy (IN PROGRESS - Nov 9, 2025)
 
-**Status:** 🔜 Next feature to implement (USDA exact match rate is ~0%, fuzzy matching will improve coverage)
+**Status:** 🔥 Currently implementing
 
-**When triggered:**
-1. Exact barcode lookup fails in USDA API
-2. Product name available from UPCitemdb or OFF
-3. User initiates validation in Desktop Pantry app
+**Workflow:**
 
-**What we capture:**
-- Top 3 name-based search results from USDA
-- Each result includes: `matched_upc`, `match_score`, `api_nutrition_data`
-- Flag: `requires_verification: true`, `match_type: 'fuzzy_name'`
-- Confidence score: String similarity between product names (0-100)
+**1. During Scanning (Automatic):**
+- Exact barcode lookup fails in USDA API
+- Product name available from UPCitemdb or OFF
+- Fuzzy search USDA by product name
+- Calculate string similarity scores for ALL results
+- **Check validation history** (`usda_match_validations` table)
+- **Filter out previously REJECTED matches** for this scanned UPC
+- **Boost confidence** for previously ACCEPTED matches (+20 points)
+- Take top 3 AFTER filtering and boosting
+- Store all 3 matches in `inventory_items` with metadata
+
+**2. User Validation (Desktop Pantry - Later):**
+- User sees top 3 USDA matches side-by-side with scanned data
+- User can ACCEPT or REJECT each match
+- Accepted matches: Stored in `usda_match_validations` with `validated=TRUE`
+- Rejected matches: Stored with `validated=FALSE`
+- Previously accepted matches show as "✓ Previously validated"
+
+**3. Future Scans (Learning System):**
+- Same scanned UPC → Check validation table
+- Skip all rejected USDA FDC IDs
+- Boost confidence for accepted USDA FDC IDs
+- Show next 3 best matches (e.g., #4, #5, #6 if #1-3 were rejected)
 
 **Example flow:**
 1. Scan `0039400018834` → USDA exact barcode fails ✗
-2. Get product name from UPCitemdb: "Bush's Black Beans"
-3. Search USDA by name "Bush Black Beans": Returns 66,000+ results
-4. Calculate string similarity scores for top 10 results
-5. Capture top 3 best matches with confidence:
-   - `00039400018803` "Bush's Black Beans 15 oz" (score: 95.2)
-   - `00039400018827` "Bush's Black Beans 26.5 oz" (score: 92.1)
-   - `00039400018797` "Bush's Black Beans 39 oz" (score: 91.8)
-6. Store USDA nutrition data from best match, flagged as unverified
-7. User validates in Desktop Pantry app later
+2. Get product name from OFF: "Black Beans"
+3. Search USDA by name "Black Beans": Returns 66,000+ results
+4. Calculate string similarity scores
+5. Check `usda_match_validations` for `scanned_upc='0039400018834'`
+6. Filter out any rejected matches, boost accepted matches
+7. Take top 3 AFTER filtering:
+   - FDC ID `12345` "Bush's Black Beans 15 oz" (confidence: 95.2) ← New
+   - FDC ID `67890` "Bush Best Black Beans" (confidence: 92.1) ← New
+   - FDC ID `11111` "Black Beans, Bush's" (confidence: 91.8) ← New
+8. Store all 3 with metadata in `inventory_items`
+9. User validates later → FDC `12345` accepted, others rejected
+10. **Next scan of same barcode** → Skip `12345`, `67890`, `11111`, show `22222`, `33333`, `44444`
 
 **Why This Matters:**
 - USDA provides **Calcium, Iron, Potassium** that OFF doesn't have
-- Currently discarding valuable micronutrient data due to UPC mismatches
-- User validation ensures data accuracy while capturing more information
+- System learns from user feedback and improves over time
+- Bad matches eliminated permanently for each scanned UPC
+- Good matches reused with high confidence
 
-### UPC Alias Database
+### USDA Match Validations Table (NEW - Nov 9, 2025)
 
-**Purpose:** Many UPCs can point to the same canonical product
+**Purpose:** Track which USDA fuzzy matches are ACCEPTED or REJECTED for each scanned UPC
+
+**Why Separate from `upc_aliases`?**
+- `upc_aliases` = "These two UPCs are the SAME product" (canonical mapping)
+- `usda_match_validations` = "This USDA data CAN/CANNOT be used for this scanned UPC" (data quality assessment)
 
 **Schema:**
 ```sql
-CREATE TABLE upc_aliases (
-  id UUID PRIMARY KEY,
-  scanned_upc TEXT NOT NULL,        -- The UPC user actually scanned
-  canonical_upc TEXT NOT NULL,      -- The "primary" UPC we treat as truth
-  source TEXT NOT NULL,             -- 'usda' | 'off' | 'upc' | 'user_correction'
-  match_confidence DECIMAL,         -- API relevance score (0-100)
-  verified BOOLEAN DEFAULT false,   -- User confirmed this is correct
-  verified_at TIMESTAMP,
-  verified_by TEXT,                 -- User who validated
-  created_at TIMESTAMP DEFAULT now()
-)
+CREATE TABLE usda_match_validations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  scanned_upc TEXT NOT NULL,           -- The barcode user scanned
+  usda_fdc_id INTEGER NOT NULL,        -- USDA Food Data Central ID
+  usda_upc TEXT,                       -- USDA's barcode (might differ from scanned)
+  validated BOOLEAN NOT NULL,          -- TRUE = accepted, FALSE = rejected
+  validated_at TIMESTAMP DEFAULT now(),
+  validated_by TEXT,                   -- User who validated
+  match_confidence DECIMAL,            -- Original confidence score when matched
+  product_name_scanned TEXT,           -- Product name when scanned
+  product_name_usda TEXT,              -- USDA product description
 
--- Index for fast lookup during scanning
-CREATE INDEX idx_upc_aliases_scanned ON upc_aliases(scanned_upc);
+  -- Prevent duplicate validations
+  UNIQUE(scanned_upc, usda_fdc_id)
+);
+
+CREATE INDEX idx_usda_validations_scanned ON usda_match_validations(scanned_upc);
+CREATE INDEX idx_usda_validations_fdc_id ON usda_match_validations(usda_fdc_id);
 ```
+
+**Lookup Logic During Scanning:**
+```javascript
+// Before showing top 3 USDA matches
+const validations = await supabase
+  .from('usda_match_validations')
+  .select('usda_fdc_id, validated, match_confidence')
+  .eq('scanned_upc', scannedBarcode);
+
+// Filter results
+const accepted = validations.filter(v => v.validated === true);
+const rejected = validations.filter(v => v.validated === false);
+
+// Remove rejected from candidate list
+const candidates = allUSDAMatches.filter(match =>
+  !rejected.some(r => r.usda_fdc_id === match.fdc_id)
+);
+
+// Boost accepted matches
+candidates.forEach(match => {
+  if (accepted.some(a => a.usda_fdc_id === match.fdc_id)) {
+    match.confidence += 20; // Boost confidence
+    match.previously_validated = true;
+  }
+});
+
+// Return top 3
+return candidates.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+```
+
+### UPC Alias Database (Future - For Canonical Product Mapping)
+
+**Purpose:** Many UPCs can point to the same canonical product
+
+**Note:** This is DIFFERENT from USDA validations. Will be implemented later for inventory deduplication.
 
 **Validation Workflow (Desktop Pantry App - Future):**
 1. User sees item flagged "⚠️ USDA data from similar product"
@@ -2103,11 +2165,55 @@ RETURNS TABLE(
    - **Decision:** Implement fuzzy name-based matching with confidence scoring + user validation
 
 ### Short-Term (Next 1-2 Weeks)
-4. **🔜 PRIORITY: Implement USDA fuzzy matching**
-   - Add name-based search when exact barcode fails
-   - Calculate string similarity confidence scores
-   - Store top match with `requires_verification: true` flag
-   - Add confidence tracking fields to database
+4. **🔥 IN PROGRESS: Implement USDA fuzzy matching in scanner workflow**
+
+   **Phase 1: Database Schema** ✅ COMPLETE (Nov 9, 2025)
+   - ✅ Created `usda_match_validations` table
+     - Tracks user acceptance/rejection of USDA fuzzy matches
+     - Keys on `scanned_upc` + `usda_fdc_id` (not product name)
+     - Stores validation status (TRUE = accepted, FALSE = rejected)
+     - Enables confidence boosting (+20 pts if previously accepted)
+     - Filters out rejected matches from future top 3 results
+   - ✅ Added fields to `inventory_items` table
+     - `usda_fuzzy_matches` JSONB - Array of top 3 matches with metadata
+     - `usda_fuzzy_match_count` INTEGER - Quick count (0-3)
+     - `requires_usda_validation` BOOLEAN - Flag for Desktop Pantry UI
+   - ✅ Deployed migrations to Supabase
+
+   **Phase 2: Edge Function Implementation** 🔜 NEXT (Current Task)
+   - **Implementation Location:** After line 250 in `scanner-ingest/index.ts`
+     - At this point we have `product.food_name` from OFF/UPC APIs
+     - We have `barcode` that was scanned
+     - USDA exact match already failed (line 140)
+   - **Step 1:** Create `performUSDAFuzzySearch()` helper function
+     - Input: `productName` (from OFF/UPC), `barcode`, `supabaseClient`
+     - Call USDA API: `/foods/search?query={productName}&dataType=Branded&pageSize=50`
+     - Returns: Array of all USDA results
+   - **Step 2:** Create `calculateStringSimilarity()` helper function
+     - Input: `str1`, `str2`
+     - Algorithm: Levenshtein distance or Jaro-Winkler
+     - Returns: Confidence score 0-100
+   - **Step 3:** Create `filterAndRankUSDAMatches()` helper function
+     - Input: `allMatches`, `scannedBarcode`, `scannedProductName`, `supabaseClient`
+     - Query `usda_match_validations` table for existing validations
+     - Calculate similarity scores for each USDA result
+     - Filter out previously rejected matches
+     - Boost confidence for previously accepted matches (+20 points)
+     - Sort by confidence score
+     - Return top 3 with metadata
+   - **Step 4:** Update inventory item insert (line 310)
+     - Add `usda_fuzzy_matches` field with top 3 results
+     - Add `usda_fuzzy_match_count` field
+     - Add `requires_usda_validation: true` if matches exist
+     - Store complete nutrition data for each match
+
+   **Phase 3: Desktop Pantry Validation UI** (Future)
+   - Show top 3 matches side-by-side with scanned data
+   - User accepts/rejects each match
+   - Accepted matches marked "Previously validated" on future scans
+   - Rejected matches never shown again for that scanned UPC
+
+   **Goal:** Automation captures USDA data DURING scanning, user validates LATER, system learns and improves
 5. **Continue internal testing** - Scan 20-50 household items
 6. **Document data quality issues** in TESTING.md
 7. **Review multi-source data display** in Pantry app (show provenance)
@@ -2132,6 +2238,6 @@ RETURNS TABLE(
 ---
 
 **End of Handoff Document**
-**Status:** ✅ Fully Operational - 10 items scanned, USDA investigation complete
-**Last Updated:** November 9, 2025, 3:00 PM
-**Last Session:** USDA API investigation - Root cause identified, fuzzy matching solution planned
+**Status:** 🔥 IN PROGRESS - Phase 1 Complete (Database), Starting Phase 2 (Edge Function Implementation)
+**Last Updated:** November 9, 2025, 6:00 PM
+**Last Session:** Database schema complete and deployed. Documented detailed implementation plan for Phase 2: fuzzy USDA search, string similarity scoring, validation filtering, and top 3 match storage in edge function.

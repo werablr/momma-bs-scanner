@@ -139,6 +139,10 @@ serve(async (req) => {
               } else {
                 console.log('✗ USDA: No exact barcode match found')
                 usdaData = null
+
+                // NOTE: Fuzzy matching will be implemented later after we have product name from OFF/UPC
+                // This is a placeholder for the fuzzy matching logic that will be called after
+                // OFF and UPC APIs provide us with a product name to search by
               }
             } else {
               await dbLog(supabaseClient, 'info', 'USDA API failed', { status: usdaResponse.status }, barcode)
