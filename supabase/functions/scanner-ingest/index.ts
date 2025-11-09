@@ -56,7 +56,6 @@ serve(async (req) => {
 
         await dbLog(supabaseClient, 'debug', 'Catalog check complete', { found: !!catalogProduct, error: catalogError?.message }, barcode)
 
-        let usdaData: any = null
         let upcitemdbData: any = null
         let openfoodfactsData: any = null
         let product: any = null
@@ -65,26 +64,20 @@ serve(async (req) => {
         let sourcesPriority = 'api_fresh'
 
         // Multi-source nutrition data (for provenance tracking)
-        let usdaNutrition: any = {}
         let offNutrition: any = {}
         let upcNutrition: any = {}
 
         if (catalogProduct && !catalogError) {
           await dbLog(supabaseClient, 'debug', 'Using cached product data', {
-            has_usda: !!catalogProduct.usda_data,
             has_upcitemdb: !!catalogProduct.upcitemdb_data,
             has_openfoodfacts: !!catalogProduct.openfoodfacts_data
           }, barcode)
           console.log('✓ Found in product_catalog (cached), using stored data')
-          usdaData = catalogProduct.usda_data
           upcitemdbData = catalogProduct.upcitemdb_data
           openfoodfactsData = catalogProduct.openfoodfacts_data
 
-          // Try to extract product from cached data (priority: USDA > OpenFoodFacts > UPCitemdb)
-          if (usdaData?.foods?.[0]) {
-            product = extractUSDAProduct(usdaData.foods[0])
-            usdaNutrition = extractUSDANutrition(usdaData.foods[0])
-          } else if (openfoodfactsData?.product?.product_name) {
+          // Try to extract product from cached data (priority: OpenFoodFacts > UPCitemdb)
+          if (openfoodfactsData?.product?.product_name) {
             product = extractOFFProduct(openfoodfactsData.product)
             offNutrition = extractOFFNutrition(openfoodfactsData.product)
           } else if (upcitemdbData?.items?.[0]) {
@@ -103,57 +96,7 @@ serve(async (req) => {
         } else {
           console.log('✗ Not in catalog, calling APIs...')
 
-          // PRIORITY 2: Call USDA FoodData Central API
-          const usdaApiKey = Deno.env.get('USDA_API_KEY') || 'DEMO_KEY'
-
-          console.log('Trying USDA FoodData Central API...')
-          try {
-            const usdaResponse = await fetch(
-              `https://api.nal.usda.gov/fdc/v1/foods/search?query=${barcode}&dataType=Branded&pageSize=5&api_key=${usdaApiKey}`,
-              {
-                headers: {
-                  'Accept': 'application/json',
-                },
-              }
-            )
-
-            if (usdaResponse.ok) {
-              usdaData = await usdaResponse.json()
-
-              // Filter results to match exact barcode (USDA search can return partial matches)
-              const exactMatch = usdaData.foods?.find((food: any) =>
-                food.gtinUpc === barcode
-              )
-
-              if (exactMatch) {
-                await dbLog(supabaseClient, 'info', 'USDA found product', {
-                  description: exactMatch.description,
-                  fdcId: exactMatch.fdcId
-                }, barcode)
-                console.log('✓ USDA found product:', exactMatch.description)
-                product = extractUSDAProduct(exactMatch)
-                usdaNutrition = extractUSDANutrition(exactMatch)
-
-                // Store just the matched food for catalog
-                usdaData = { foods: [exactMatch] }
-              } else {
-                console.log('✗ USDA: No exact barcode match found')
-                usdaData = null
-
-                // NOTE: Fuzzy matching will be implemented later after we have product name from OFF/UPC
-                // This is a placeholder for the fuzzy matching logic that will be called after
-                // OFF and UPC APIs provide us with a product name to search by
-              }
-            } else {
-              await dbLog(supabaseClient, 'info', 'USDA API failed', { status: usdaResponse.status }, barcode)
-              console.log('✗ USDA API failed:', usdaResponse.status)
-            }
-          } catch (error) {
-            console.error('USDA API error:', error)
-            await dbLog(supabaseClient, 'error', 'USDA API exception', { error: error.message }, barcode)
-          }
-
-          // PRIORITY 3: Call UPCitemdb API for package size & pricing (also fallback for product data)
+          // PRIORITY 2: Call UPCitemdb API for package size & pricing (also fallback for product data)
           console.log('Calling UPCitemdb API...')
           try {
             const upcitemdbResponse = await fetch(
@@ -174,7 +117,7 @@ serve(async (req) => {
               if (item && (item.title || item.description)) {
                 console.log('✓ UPCitemdb found product:', item.title || item.description)
 
-                // If USDA didn't find product, use UPCitemdb data as fallback
+                // Use UPCitemdb data as fallback if OFF didn't find product
                 if (!product) {
                   await dbLog(supabaseClient, 'info', 'Using UPCitemdb as fallback product source', { title: item.title }, barcode)
                   console.log('→ Using UPCitemdb as primary product source')
@@ -253,7 +196,7 @@ serve(async (req) => {
           await dbLog(supabaseClient, 'debug', 'Final check - product state', { has_product: !!product, product_value: product }, barcode)
           if (!product) {
             await dbLog(supabaseClient, 'error', 'Product not found in any API', { barcode }, barcode)
-            console.error('✗ Product not found in any API (USDA, UPCitemdb, Open Food Facts)')
+            console.error('✗ Product not found in any API (UPCitemdb, Open Food Facts)')
             return new Response(
               JSON.stringify({
                 success: false,
@@ -279,7 +222,7 @@ serve(async (req) => {
               p_verified_by_user: false,
               p_source_priority: packageSize ? 'title_parsed' : 'none',
               p_data_sources: {
-                usda: usdaData ? true : false,
+                usda: false, // USDA enrichment now handled by Pantry app
                 upcitemdb: upcitemdbData ? true : false,
                 openfoodfacts: openfoodfactsData ? true : false,
               },
@@ -288,8 +231,8 @@ serve(async (req) => {
               p_nutritionix_data: null, // DEPRECATED
               p_upcitemdb_data: upcitemdbData,
               p_openfoodfacts_data: openfoodfactsData,
-              p_usda_data: usdaData,
-              p_usda_fdc_id: usdaData?.foods?.[0]?.fdcId || null,
+              p_usda_data: null, // USDA enrichment now handled by Pantry app
+              p_usda_fdc_id: null,
             })
 
           if (catalogSaveError) {
@@ -300,8 +243,8 @@ serve(async (req) => {
           }
         }
 
-        // Select best nutrition values (USDA > OFF > UPC)
-        const bestNutrition = selectBestNutrition(usdaNutrition, offNutrition, upcNutrition)
+        // Select best nutrition values (OFF > UPC) - USDA enrichment handled by Pantry app
+        const bestNutrition = selectBestNutrition(offNutrition, upcNutrition)
 
         // Extract Open Food Facts health/environmental data
         const offExtracted = extractOpenFoodFactsData(openfoodfactsData)
@@ -323,24 +266,24 @@ serve(async (req) => {
             serving_unit: product.serving_unit,
             serving_weight_grams: product.serving_weight_grams,
 
-            // USDA-specific nutrition data (provenance)
-            usda_calories: usdaNutrition.usda_calories,
-            usda_protein: usdaNutrition.usda_protein,
-            usda_total_fat: usdaNutrition.usda_total_fat,
-            usda_saturated_fat: usdaNutrition.usda_saturated_fat,
-            usda_trans_fat: usdaNutrition.usda_trans_fat,
-            usda_cholesterol: usdaNutrition.usda_cholesterol,
-            usda_sodium: usdaNutrition.usda_sodium,
-            usda_total_carbohydrate: usdaNutrition.usda_total_carbohydrate,
-            usda_dietary_fiber: usdaNutrition.usda_dietary_fiber,
-            usda_sugars: usdaNutrition.usda_sugars,
-            usda_added_sugars: usdaNutrition.usda_added_sugars,
-            usda_potassium: usdaNutrition.usda_potassium,
-            usda_vitamin_d: usdaNutrition.usda_vitamin_d,
-            usda_calcium: usdaNutrition.usda_calcium,
-            usda_iron: usdaNutrition.usda_iron,
-            usda_fdc_id: usdaData?.foods?.[0]?.fdcId || null,
-            usda_raw_data: usdaData?.foods?.[0] || null,
+            // USDA-specific nutrition data (provenance) - NULL for now, enriched by Pantry app
+            usda_calories: null,
+            usda_protein: null,
+            usda_total_fat: null,
+            usda_saturated_fat: null,
+            usda_trans_fat: null,
+            usda_cholesterol: null,
+            usda_sodium: null,
+            usda_total_carbohydrate: null,
+            usda_dietary_fiber: null,
+            usda_sugars: null,
+            usda_added_sugars: null,
+            usda_potassium: null,
+            usda_vitamin_d: null,
+            usda_calcium: null,
+            usda_iron: null,
+            usda_fdc_id: null,
+            usda_raw_data: null,
 
             // OFF-specific nutrition data (provenance)
             off_calories: offNutrition.off_calories,
@@ -406,7 +349,7 @@ serve(async (req) => {
 
             // Data sources tracking
             data_sources: {
-              usda: usdaData ? true : false,
+              usda: false, // USDA enrichment handled by Pantry app
               upcitemdb: upcitemdbData ? true : false,
               openfoodfacts: openfoodfactsData ? true : false,
             },
@@ -564,67 +507,6 @@ serve(async (req) => {
 
 // ==================== HELPER FUNCTIONS ====================
 
-// Extract product data from USDA FoodData Central response
-function extractUSDAProduct(food: any) {
-  return {
-    food_name: food.description || food.lowercaseDescription || 'Unknown Product',
-    brand_name: food.brandName || food.brandOwner || 'Unknown Brand',
-    serving_qty: food.servingSize || null,
-    serving_unit: food.servingSizeUnit || null,
-    serving_weight_grams: food.servingSize || null, // USDA uses grams typically
-    photo_thumb: null, // USDA doesn't provide photos
-    photo_highres: null,
-  }
-}
-
-// Extract nutrition data from USDA FoodData Central response
-function extractUSDANutrition(food: any) {
-  const nutrients: any = {}
-
-  // USDA nutrients are in foodNutrients array
-  if (food.foodNutrients && Array.isArray(food.foodNutrients)) {
-    food.foodNutrients.forEach((nutrient: any) => {
-      const name = nutrient.nutrientName || nutrient.nutrient?.name || ''
-      const amount = nutrient.value || nutrient.amount || null
-
-      // Map USDA nutrient names to our schema
-      if (name.includes('Energy') || name.includes('Calories')) {
-        nutrients.usda_calories = amount
-      } else if (name.includes('Protein')) {
-        nutrients.usda_protein = amount
-      } else if (name.includes('Total lipid') || name.includes('Total Fat')) {
-        nutrients.usda_total_fat = amount
-      } else if (name.includes('Fatty acids, total saturated')) {
-        nutrients.usda_saturated_fat = amount
-      } else if (name.includes('Fatty acids, total trans')) {
-        nutrients.usda_trans_fat = amount
-      } else if (name.includes('Cholesterol')) {
-        nutrients.usda_cholesterol = amount
-      } else if (name.includes('Sodium')) {
-        nutrients.usda_sodium = amount
-      } else if (name.includes('Carbohydrate')) {
-        nutrients.usda_total_carbohydrate = amount
-      } else if (name.includes('Fiber')) {
-        nutrients.usda_dietary_fiber = amount
-      } else if (name.includes('Sugars, total')) {
-        nutrients.usda_sugars = amount
-      } else if (name.includes('Sugars, added')) {
-        nutrients.usda_added_sugars = amount
-      } else if (name.includes('Potassium')) {
-        nutrients.usda_potassium = amount
-      } else if (name.includes('Vitamin D')) {
-        nutrients.usda_vitamin_d = amount
-      } else if (name.includes('Calcium')) {
-        nutrients.usda_calcium = amount
-      } else if (name.includes('Iron')) {
-        nutrients.usda_iron = amount
-      }
-    })
-  }
-
-  return nutrients
-}
-
 // Extract product data from Open Food Facts response
 function extractOFFProduct(product: any) {
   return {
@@ -673,28 +555,29 @@ function extractUPCProduct(item: any) {
 // Select nutrition values for display (nf_* fields)
 // PHILOSOPHY: All API sources are equal - no hierarchy, no "better" source
 // EXCEPTION: User input ALWAYS takes priority when present (user knows best)
-// CURRENT STRATEGY: Use first available value (USER → USDA → OFF → UPC order)
+// CURRENT STRATEGY: Use first available value (USER → OFF → UPC order)
 //   - User input = highest priority (they looked at the label!)
 //   - API order is NOT a quality hierarchy, just pragmatic "use what we got first"
 //   - All source-specific values (user_*, usda_*, off_*, upc_*) are ALWAYS stored separately
+//   - USDA enrichment handled by Pantry app (user validates fuzzy matches)
 // FUTURE: Will analyze real data (20-50 scans) to determine best selection logic:
 //   - Average all available sources?
 //   - Weighted average based on observed accuracy?
 //   - Per-nutrient logic (e.g., government data for macros, community data for allergens)?
 //   - User choice per item in Pantry app?
 // THIS FUNCTION IS TEMPORARY - Easy to change once we have data to inform the decision
-function selectBestNutrition(usdaNutrition: any, offNutrition: any, upcNutrition: any, userNutrition: any = {}) {
+function selectBestNutrition(offNutrition: any, upcNutrition: any, userNutrition: any = {}) {
   return {
-    nf_calories: userNutrition.user_calories ?? usdaNutrition.usda_calories ?? offNutrition.off_calories ?? upcNutrition.upc_calories ?? null,
-    nf_protein: userNutrition.user_protein ?? usdaNutrition.usda_protein ?? offNutrition.off_protein ?? upcNutrition.upc_protein ?? null,
-    nf_total_fat: userNutrition.user_total_fat ?? usdaNutrition.usda_total_fat ?? offNutrition.off_total_fat ?? upcNutrition.upc_total_fat ?? null,
-    nf_saturated_fat: userNutrition.user_saturated_fat ?? usdaNutrition.usda_saturated_fat ?? offNutrition.off_saturated_fat ?? null,
-    nf_cholesterol: userNutrition.user_cholesterol ?? usdaNutrition.usda_cholesterol ?? null, // OFF doesn't track cholesterol
-    nf_sodium: userNutrition.user_sodium ?? usdaNutrition.usda_sodium ?? offNutrition.off_sodium ?? upcNutrition.upc_sodium ?? null,
-    nf_total_carbohydrate: userNutrition.user_total_carbohydrate ?? usdaNutrition.usda_total_carbohydrate ?? offNutrition.off_total_carbohydrate ?? null,
-    nf_dietary_fiber: userNutrition.user_dietary_fiber ?? usdaNutrition.usda_dietary_fiber ?? offNutrition.off_dietary_fiber ?? null,
-    nf_sugars: userNutrition.user_sugars ?? usdaNutrition.usda_sugars ?? offNutrition.off_sugars ?? null,
-    nf_potassium: userNutrition.user_potassium ?? usdaNutrition.usda_potassium ?? offNutrition.off_potassium ?? null,
+    nf_calories: userNutrition.user_calories ?? offNutrition.off_calories ?? upcNutrition.upc_calories ?? null,
+    nf_protein: userNutrition.user_protein ?? offNutrition.off_protein ?? upcNutrition.upc_protein ?? null,
+    nf_total_fat: userNutrition.user_total_fat ?? offNutrition.off_total_fat ?? upcNutrition.upc_total_fat ?? null,
+    nf_saturated_fat: userNutrition.user_saturated_fat ?? offNutrition.off_saturated_fat ?? null,
+    nf_cholesterol: userNutrition.user_cholesterol ?? null, // OFF doesn't track cholesterol, USDA enrichment via Pantry
+    nf_sodium: userNutrition.user_sodium ?? offNutrition.off_sodium ?? upcNutrition.upc_sodium ?? null,
+    nf_total_carbohydrate: userNutrition.user_total_carbohydrate ?? offNutrition.off_total_carbohydrate ?? null,
+    nf_dietary_fiber: userNutrition.user_dietary_fiber ?? offNutrition.off_dietary_fiber ?? null,
+    nf_sugars: userNutrition.user_sugars ?? offNutrition.off_sugars ?? null,
+    nf_potassium: userNutrition.user_potassium ?? offNutrition.off_potassium ?? null,
   }
 }
 

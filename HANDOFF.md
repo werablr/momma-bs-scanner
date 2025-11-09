@@ -6,85 +6,113 @@
 
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
-**Purpose:** Data ingestion via barcode scanning
+**Purpose:** Data ingestion via barcode scanning (OFF + UPC APIs only)
 **Date:** November 9, 2025
-**Status:** ✅ **WORKING** - Multi-Source Strategy Operational (OFF + UPC), Manual Entry Fixed
+**Status:** ✅ **WORKING** - Two-API Strategy (OFF + UPC), USDA Moved to Pantry App
+
+---
+
+## 🔄 ARCHITECTURAL CHANGE: USDA → Pantry App (Nov 9, 2025)
+
+**Decision:** USDA enrichment removed from Scanner, moved to Pantry app
+
+**Rationale:**
+- **Scanner priority:** Speed and reliability during physical scanning workflow
+- **USDA complexity:** Fuzzy matching is slow, requires user validation with desktop UI
+- **User experience:** On-demand enrichment (user chooses when to add USDA data)
+- **Separation of concerns:** Scanner = fast ingestion, Pantry = detailed validation
+
+**What Changed:**
+- ❌ **Removed:** All USDA API calls from `scanner-ingest` edge function
+- ❌ **Removed:** USDA extraction functions (`extractUSDAProduct`, `extractUSDANutrition`)
+- ❌ **Removed:** USDA fuzzy matching logic (Levenshtein distance, validation checks)
+- ✅ **Kept:** All `usda_*` columns in database (set to NULL, Pantry will populate)
+- ✅ **Kept:** `usda_match_validations` table (Pantry will use for validation workflow)
+
+**Scanner Now Handles:**
+- ✅ Barcode scanning
+- ✅ Open Food Facts API (nutrition, photos, health scores, dietary flags)
+- ✅ UPCitemdb API (package sizes, product names)
+- ✅ Manual entry (no barcode products)
+
+**Pantry Will Handle (Future):**
+- 🔜 USDA data enrichment (on-demand, user-initiated)
+- 🔜 Fuzzy matching with product name similarity
+- 🔜 User validation of USDA matches (side-by-side comparison UI)
+- 🔜 Micronutrient additions (Calcium, Iron, Potassium from USDA)
+
+**See:** [Pantry HANDOFF.md](../momma-bs-pantry/HANDOFF.md) for USDA enrichment implementation plan
 
 ---
 
 ## ✅ SYSTEM OPERATIONAL (Nov 9, 2025)
 
 **All Systems Working:**
-- ✅ Multi-source API strategy operational (OFF + UPC)
+- ✅ Two-API strategy operational (OFF + UPC)
 - ✅ Barcode scanning functional
-- ✅ **Manual entry fixed** - No longer requires barcode (generates `MANUAL-{timestamp}`)
-- ✅ Edge function properly handling all constraints
+- ✅ Manual entry fixed - No longer requires barcode (generates `MANUAL-{timestamp}`)
+- ✅ Edge function deployed and operational
 - ✅ Data flowing from APIs → Database
 
 **Current API Performance:**
 - ✅ **Open Food Facts** - Working perfectly (nutrition, photos, health scores, dietary flags)
 - ✅ **UPCitemdb** - Working perfectly (package sizes)
-- ⚠️ **USDA FoodData Central** - Low exact barcode match rate (~0% for current products)
-  - **Root Cause Identified (Nov 9):** USDA branded database has limited UPC coverage
-  - **Example:** Scanned `0039400018834` (Bush's) → Not in USDA, but USDA has `00039400018803` (different variant)
-  - **Data Quality:** When USDA matches, provides valuable micronutrients (Calcium, Iron, Potassium) that OFF lacks
-  - **Next Step:** Implementing fuzzy name-based matching with confidence scoring + user validation
 
 **Recent Session (Nov 9, 2025):**
-- 10 items successfully scanned with barcodes
-- Manual entry debugged and fixed (barcode constraint + volume_remaining constraint)
-- Generated unique barcodes for manual entries: `MANUAL-{timestamp}` format
+- USDA logic removed from scanner (moved to Pantry app)
+- Edge function redeployed successfully
+- 10 items in inventory, ready for continued testing
 
 ---
 
-## 🔄 CRITICAL UPDATE: Multi-Source Data Strategy (Nov 7, 2025)
+## 🔄 UPDATED: Two-API Scanner Strategy (Nov 9, 2025)
 
-**Issue:** Nutritionix subscription expired, $499/month paid tier required
+**Previous:** Nutritionix subscription expired ($499/month), migrated to multi-API free sources
+**Current:** Scanner uses OFF + UPC only, USDA moved to Pantry app
 
-**Solution:** Multi-source free API strategy with complete data provenance + fuzzy matching
+### Scanner API Architecture
 
-### New API Architecture (Replacing Nutritionix)
+**Philosophy: Fast and Reliable Data Ingestion**
 
-**Philosophy: Capture Everything, Show the Best, Validate Later**
-
-Instead of relying on one API, we now aggregate data from **all free sources**, track provenance, and handle UPC mismatches intelligently:
+Scanner prioritizes speed during physical scanning workflow. USDA enrichment (slow fuzzy matching + validation) deferred to Pantry app.
 
 ```
 PRIORITY 1: Check product_catalog (cached data - skip APIs)
 
-PRIORITY 2: USDA FoodData Central ✅ NEW!
-   └─> FREE - 1,000 requests/hour
-   └─> Government nutrition data (highest quality)
-   └─> Branded foods by UPC/GTIN
-   └─> API: https://api.nal.usda.gov/fdc/v1/foods/search
-
-PRIORITY 3: UPCitemdb (existing)
+PRIORITY 2: UPCitemdb
    └─> FREE - 100 requests/day
    └─> Product names, brands, package sizes
    └─> Pricing data
 
-PRIORITY 4: Open Food Facts (existing)
+PRIORITY 3: Open Food Facts
    └─> FREE - UNLIMITED
    └─> Health scores (Nutri-Score, NOVA)
+   └─> Nutrition data
    └─> Photos, environmental data
    └─> Dietary flags (vegan, vegetarian)
 
-PRIORITY 5: Manual entry fallback
+PRIORITY 4: Manual entry fallback
 ```
+
+**USDA FoodData Central** (moved to Pantry app):
+- Not called during scanning (slow, requires validation)
+- On-demand enrichment in Pantry app
+- User-validated fuzzy matching with desktop UI
 
 ### Database Schema: Multi-Source Columns
 
-**Design Principle:** Never assume one source is always correct. Store ALL data, let application logic choose best value.
+**Design Principle:** Store ALL data sources separately, track provenance
 
 **Schema Structure (per nutrient):**
 ```sql
 -- Source-specific columns (track provenance)
-usda_calories DECIMAL,
-off_calories DECIMAL,
-upc_calories DECIMAL,
+usda_calories DECIMAL,  -- NULL from Scanner, populated by Pantry
+off_calories DECIMAL,   -- Populated by Scanner
+upc_calories DECIMAL,   -- Populated by Scanner
 
 -- Single Source of Truth (displayed value)
-nf_calories DECIMAL  -- Auto-selected: COALESCE(usda, off, upc)
+nf_calories DECIMAL  -- Auto-selected: COALESCE(off, upc) in Scanner
+                     -- Will become: COALESCE(user, usda, off, upc) after Pantry enrichment
 ```
 
 **Benefits:**
@@ -111,301 +139,10 @@ nf_calories DECIMAL  -- Auto-selected: COALESCE(usda, off, upc)
 
 ---
 
-## 🔗 USDA Fuzzy Matching & Validation System (Nov 9, 2025)
-
-**Problem:** USDA has limited exact UPC coverage (~0% match rate), but valuable micronutrient data (Calcium, Iron, Potassium)
-
-**Real-World Example:**
-- Scan UPC `0039400018834` (Bush's Black Beans 15oz)
-- USDA has no exact match for this UPC
-- USDA **does** have UPC `00039400018803` (Bush's Black Beans, different variant)
-- Nutrition data is nearly identical → Should we discard USDA data? NO!
-
-**Solution: Fuzzy Name Matching + Learning System**
-
-### Core Principle: "Capture Everything, Even Uncertain Matches"
-
-**Instead of:**
-```
-Exact barcode match fails → Discard API data → Move to next API
-```
-
-**We do:**
-```
-Exact barcode match fails → Name-based fuzzy search → Capture top 3 matches with metadata → Flag for user verification → Learn from corrections
-```
-
-### Fuzzy Matching Strategy (✅ IMPLEMENTED - Nov 9, 2025)
-
-**Status:** ✅ **COMPLETE** - Deployed to production edge function
-
-**Workflow:**
-
-**1. During Scanning (Automatic):**
-- Exact barcode lookup fails in USDA API
-- Product name available from UPCitemdb or OFF
-- Fuzzy search USDA by product name
-- Calculate string similarity scores for ALL results
-- **Check validation history** (`usda_match_validations` table)
-- **Filter out previously REJECTED matches** for this scanned UPC
-- **Boost confidence** for previously ACCEPTED matches (+20 points)
-- Take top 3 AFTER filtering and boosting
-- Store all 3 matches in `inventory_items` with metadata
-
-**2. User Validation (Desktop Pantry - Later):**
-- User sees top 3 USDA matches side-by-side with scanned data
-- User can ACCEPT or REJECT each match
-- Accepted matches: Stored in `usda_match_validations` with `validated=TRUE`
-- Rejected matches: Stored with `validated=FALSE`
-- Previously accepted matches show as "✓ Previously validated"
-
-**3. Future Scans (Learning System):**
-- Same scanned UPC → Check validation table
-- Skip all rejected USDA FDC IDs
-- Boost confidence for accepted USDA FDC IDs
-- Show next 3 best matches (e.g., #4, #5, #6 if #1-3 were rejected)
-
-**Example flow:**
-1. Scan `0039400018834` → USDA exact barcode fails ✗
-2. Get product name from OFF: "Black Beans"
-3. Search USDA by name "Black Beans": Returns 66,000+ results
-4. Calculate string similarity scores
-5. Check `usda_match_validations` for `scanned_upc='0039400018834'`
-6. Filter out any rejected matches, boost accepted matches
-7. Take top 3 AFTER filtering:
-   - FDC ID `12345` "Bush's Black Beans 15 oz" (confidence: 95.2) ← New
-   - FDC ID `67890` "Bush Best Black Beans" (confidence: 92.1) ← New
-   - FDC ID `11111` "Black Beans, Bush's" (confidence: 91.8) ← New
-8. Store all 3 with metadata in `inventory_items`
-9. User validates later → FDC `12345` accepted, others rejected
-10. **Next scan of same barcode** → Skip `12345`, `67890`, `11111`, show `22222`, `33333`, `44444`
-
-**Why This Matters:**
-- USDA provides **Calcium, Iron, Potassium** that OFF doesn't have
-- System learns from user feedback and improves over time
-- Bad matches eliminated permanently for each scanned UPC
-- Good matches reused with high confidence
-
-### USDA Match Validations Table (NEW - Nov 9, 2025)
-
-**Purpose:** Track which USDA fuzzy matches are ACCEPTED or REJECTED for each scanned UPC
-
-**Why Separate from `upc_aliases`?**
-- `upc_aliases` = "These two UPCs are the SAME product" (canonical mapping)
-- `usda_match_validations` = "This USDA data CAN/CANNOT be used for this scanned UPC" (data quality assessment)
-
-**Schema:**
-```sql
-CREATE TABLE usda_match_validations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  scanned_upc TEXT NOT NULL,           -- The barcode user scanned
-  usda_fdc_id INTEGER NOT NULL,        -- USDA Food Data Central ID
-  usda_upc TEXT,                       -- USDA's barcode (might differ from scanned)
-  validated BOOLEAN NOT NULL,          -- TRUE = accepted, FALSE = rejected
-  validated_at TIMESTAMP DEFAULT now(),
-  validated_by TEXT,                   -- User who validated
-  match_confidence DECIMAL,            -- Original confidence score when matched
-  product_name_scanned TEXT,           -- Product name when scanned
-  product_name_usda TEXT,              -- USDA product description
-
-  -- Prevent duplicate validations
-  UNIQUE(scanned_upc, usda_fdc_id)
-);
-
-CREATE INDEX idx_usda_validations_scanned ON usda_match_validations(scanned_upc);
-CREATE INDEX idx_usda_validations_fdc_id ON usda_match_validations(usda_fdc_id);
-```
-
-**Lookup Logic During Scanning:**
-```javascript
-// Before showing top 3 USDA matches
-const validations = await supabase
-  .from('usda_match_validations')
-  .select('usda_fdc_id, validated, match_confidence')
-  .eq('scanned_upc', scannedBarcode);
-
-// Filter results
-const accepted = validations.filter(v => v.validated === true);
-const rejected = validations.filter(v => v.validated === false);
-
-// Remove rejected from candidate list
-const candidates = allUSDAMatches.filter(match =>
-  !rejected.some(r => r.usda_fdc_id === match.fdc_id)
-);
-
-// Boost accepted matches
-candidates.forEach(match => {
-  if (accepted.some(a => a.usda_fdc_id === match.fdc_id)) {
-    match.confidence += 20; // Boost confidence
-    match.previously_validated = true;
-  }
-});
-
-// Return top 3
-return candidates.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
-```
-
-### UPC Alias Database (Future - For Canonical Product Mapping)
-
-**Purpose:** Many UPCs can point to the same canonical product
-
-**Note:** This is DIFFERENT from USDA validations. Will be implemented later for inventory deduplication.
-
-**Validation Workflow (Desktop Pantry App - Future):**
-1. User sees item flagged "⚠️ USDA data from similar product"
-2. Desktop app shows side-by-side comparison:
-   - Scanned UPC: `0039400018834`
-   - USDA UPC: `0039400018957`
-   - Nutrition facts comparison
-   - Product photos comparison
-3. User validates: "✓ Same product" or "✗ Different product"
-4. System creates alias: `0039400018834 → 0039400018957 (verified)`
-5. Future scans of either UPC use same canonical product
-
-### Inventory Deduplication
-
-**Priority: Accurate Inventory > API Data Purity**
-
-**Problem without aliases:**
-- Monday: Scan UPC `0039400018834` → Create "Bush's Black Beans" item #1
-- Tuesday: Scan UPC `0039400018957` → Create "Bush's Black Beans" item #2
-- Result: Two pantry entries for same product ❌
-
-**Solution with aliases:**
-- Monday: Scan UPC `0039400018834` → Create inventory item (canonical: `0039400018834`)
-- Desktop app validates: `0039400018957` is same product → Create alias
-- Tuesday: Scan UPC `0039400018957` → Lookup alias → Find canonical → Update **existing** item #1
-- Result: One pantry entry with accurate count ✅
-
-**Scanner Logic (Before Insert):**
-```typescript
-// Check if scanned UPC has a canonical alias
-const alias = await checkUPCAlias(scannedUPC)
-
-if (alias) {
-  // Find existing inventory item with canonical UPC
-  const existingItem = await findInventoryItem(alias.canonical_upc)
-
-  if (existingItem) {
-    // Update existing item (quantity, expiration, etc.)
-    return updateInventoryItem(existingItem.id, newData)
-  }
-}
-
-// No alias or no existing item → Create new inventory item
-return createInventoryItem(scannedUPC, data)
-```
-
-### API Update Strategy
-
-**Always check for updates, even with validated aliases**
-
-- Reason: API databases continuously improve (new products, corrected data)
-- Cost: Minimal (1-2 seconds per scan)
-- Benefit: Catch data corrections, new matches, updated nutrition facts
-
-**Example:**
-- Today: UPC `123` fails USDA lookup → Fuzzy match to UPC `456`
-- User validates: `123 = 456`
-- Tomorrow: USDA adds UPC `123` to their database (exact match now available!)
-- Next scan: Edge function finds exact match → Updates data → Replaces fuzzy match
-
-### Benefits of This Architecture
-
-1. **Never lose potential data** - Even uncertain matches captured for review
-2. **Self-improving system** - Every user validation teaches the system
-3. **Handle real-world complexity** - Products change UPCs constantly
-4. **API resilience** - Databases update independently, we stay current
-5. **Accurate inventory** - Multiple UPCs → One product → No duplicates
-6. **User trust** - Full transparency of data sources and confidence levels
-7. **Future-proof** - Easy to add new APIs, new matching strategies
-
-### Data Storage: Multi-Source with Confidence Tracking
-
-**Every API field stores:**
-- Source-specific value: `usda_calories`, `off_calories`, `upc_calories`
-- Confidence metadata: `usda_calories_confidence` ('exact_barcode' | 'fuzzy_name_unverified' | 'fuzzy_name_verified')
-- Source UPC: `usda_source_upc` (might differ from scanned UPC)
-- Match score: `usda_match_score` (API relevance score)
-
-**Example inventory_items record:**
-```json
-{
-  "barcode": "0039400018834",
-  "usda_calories": 120,
-  "usda_calories_confidence": "fuzzy_name_unverified",
-  "usda_source_upc": "0039400018957",
-  "usda_match_score": 95.2,
-  "off_calories": 120,
-  "off_calories_confidence": "exact_barcode",
-  "off_source_upc": "0039400018834",
-  "nf_calories": 120,  // SSoT: selected from usda/off/upc
-  "requires_verification": true,
-  "potential_upc_matches": [
-    {"upc": "0039400018957", "source": "usda", "score": 95.2},
-    {"upc": "0039400019001", "source": "usda", "score": 89.4}
-  ]
-}
-```
 
 ---
 
-### Data Selection Philosophy (Nov 7, 2025)
-
-**CRITICAL DECISION:** All API sources are equal - no hierarchy, no "better" source
-
-**Data Sources (4 total):**
-1. **User Input** (user_* columns) - Manual entry/corrections during scanning
-2. **USDA FoodData Central** (usda_* columns) - Government nutrition data
-3. **Open Food Facts** (off_* columns) - Community-sourced data
-4. **UPCitemdb** (upc_* columns) - Commercial product database
-
-**API Call Order:**
-- USDA → UPCitemdb → Open Food Facts (sequential for rate limiting)
-- User input collected during scanning workflow (manual entry/corrections)
-
-**Data Storage:**
-- ALL sources stored separately (user_*, usda_*, off_*, upc_*)
-- 100% complete data provenance
-- Timestamp tracking for user corrections (`user_verified_at`)
-
-**Display Value Selection (`nf_*` fields):**
-- **Current Strategy:** Use first available value (USER → USDA → OFF → UPC order)
-  - **USER input = ALWAYS highest priority** (they looked at the label!)
-  - API order is NOT a quality hierarchy, just pragmatic "use what we got first"
-  - Temporary until we have real data to analyze
-- **Future Strategy:** TBD after 20-50 scans
-  - Will analyze which API has best coverage/accuracy per category
-  - Options being considered:
-    - Average all available sources?
-    - Weighted average based on observed accuracy?
-    - Per-nutrient logic (e.g., government data for macros, community data for allergens)?
-    - User choice per item in Pantry app?
-  - Easy to change - just update `selectBestNutrition()` function
-
-**Why This Matters:**
-- We're not picking a "winner" API - we're collecting ALL the data first
-- User knows best when they correct something (highest trust)
-- Real-world testing will reveal which API sources are most reliable
-- Philosophy: "Store everything, decide later with evidence"
-
-### What Changed from Nutritionix
-
-**Lost:**
-- `nix_brand_id`, `nix_item_id` (just IDs, not essential)
-
-**Gained:**
-- USDA government data (higher quality)
-- Unlimited API calls (Open Food Facts)
-- Multiple photos (USDA + OFF)
-- Complete transparency (know source of each field)
-- $499/month savings
-
-**Same Quality or Better:**
-- Nutrition facts: USDA matches or exceeds Nutritionix
-- Photos: Open Food Facts has extensive image database
-- Brand/product names: UPCitemdb provides
-- Package sizes: UPCitemdb title parsing (already implemented)
+**Note:** USDA fuzzy matching documentation moved to [Pantry HANDOFF.md](../momma-bs-pantry/HANDOFF.md) where this feature will be implemented.
 
 ---
 
