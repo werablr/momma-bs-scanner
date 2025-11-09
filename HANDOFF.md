@@ -218,420 +218,7 @@ nf_calories DECIMAL  -- Auto-selected: COALESCE(off, upc) in Scanner
 
 ---
 
-## 🚀 Previous Session: API Fallback Implementation + Edge Function Logging (Oct 23, 2025, 10:30 AM - 11:10 AM)
-
-**Mission:** Fix sake bottle scanning failure, implement proper API fallback, set up edge function logging
-**Duration:** 40 minutes
-**Status:** ✅ **COMPLETE**
-
-### What We Accomplished
-
-#### 1. API Fallback System Implemented ✅
-**Problem:** Products not in Nutritionix (alcohol, non-food items) were failing with "Product not found" error
-**Solution:** Implemented proper fallback cascade across all three APIs
-
-**Before:**
-- Nutritionix fails → immediate error
-- UPCitemdb and Open Food Facts never called
-
-**After:**
-- Nutritionix fails → Try UPCitemdb → Try Open Food Facts → Error only if all fail
-- Successfully scanned: Sho Chiku Bai Sake 750ml using UPCitemdb data
-- Fixed cached product extraction to work with all data sources
-
-**Technical Changes:**
-- Modified edge function to attempt all APIs sequentially
-- Added product reconstruction from UPCitemdb and Open Food Facts when Nutritionix unavailable
-- Fixed cached data extraction to handle products saved from fallback APIs
-- Added Nutri-Score validation to prevent database constraint violations
-
-#### 2. Edge Function Logging System Created ✅
-**Problem:** No way to debug edge function failures without accessing Supabase dashboard
-**Solution:** Created queryable logging table with programmatic access
-
-**Implementation:**
-- Created `edge_function_logs` table with RLS policies
-- Added `dbLog()` helper function for structured logging
-- Can now query logs via Node.js script: `node check-logs.js`
-- Logs include: timestamp, log level, message, data payload, barcode
-
-**Benefits:**
-- Real-time debugging of edge function execution
-- No need to manually check Supabase dashboard
-- Structured logs with searchable metadata
-- Enabled rapid diagnosis of sake bottle scanning issue
-
-#### 3. Bug Fixes ✅
-- **Xcode Duplicate Project:** Removed `MommaBsScanner 2.xcodeproj` that was causing Metro warnings
-- **Cached Product Extraction:** Fixed null product when cache contains only UPCitemdb/OFF data
-- **Nutri-Score Validation:** Added validation to only allow 'a', 'b', 'c', 'd', 'e' grades
-
-### Impact
-- ✅ Scanner now supports alcoholic beverages and non-food items
-- ✅ 23rd item successfully scanned (Sho Chiku Bai Sake)
-- ✅ Edge function logging available for future debugging
-- ✅ Development velocity improved with better observability
-
----
-
-## 🚀 Previous Session: Testing Progress Update (Oct 21, 2025, 5:00-5:35 PM)
-
-**Mission:** Document testing progress, identify issues, update HANDOFF files
-**Duration:** 35 minutes
-**Status:** ✅ **COMPLETE**
-
-### What We Accomplished
-
-#### Testing Session Summary ✅
-- **22 items scanned** (44% of 50-item goal)
-- **6 out of 8 storage locations** tested
-- **Created TESTING.md** - Centralized issue tracking system
-- **Launched Pantry app** - Now running at http://localhost:3001
-- **Documented 3 issues** - 2 medium priority (package size), 1 low priority
-
-**Key Metrics:**
-- ✅ 100% health score coverage (22/22 items)
-- ✅ 82% package size capture rate (18/22 items)
-- ✅ 4.5% error rate (1 failed scan - expected behavior)
-- ✅ All location targets met (pantry, refrigerator, freezer, other)
-
----
-
-## 🚀 Previous Session: Scanner Focus Delay Fix (Oct 20, 2025, 9:00-9:30 PM)
-
-**Mission:** Fix barcode scanner capturing blurry images by adding autofocus delay
-**Duration:** 30 minutes
-**Status:** ✅ **COMPLETE**
-
-### What We Accomplished
-
-#### Scanner Autofocus Delay Implemented ✅
-- **Issue:** Barcode scanner was capturing images too quickly before camera could autofocus, resulting in blurry barcodes
-- **Solution:** Added 800ms delay between barcode detection and processing
-- **Implementation:**
-  - Created separate `scanCooldown` ref to prevent duplicate scans during focus delay
-  - Camera remains active during 800ms delay to allow autofocus to stabilize
-  - After delay, `handleBarcodeScanned` is called with focused image
-- **Result:** Scanner now captures clear, readable barcodes consistently
-
-**Technical Details:**
-- Modified `onCodeScanned` callback in BarcodeScanner.js
-- Uses `scanCooldown.current` flag (separate from `isProcessing.current`)
-- Camera stays active during delay (doesn't deactivate like it would with `isProcessing`)
-- Prevents multiple scans of same barcode during the 800ms window
-
----
-
-## 🚀 Previous Session: E2E Testing + Pantry App Planning (Oct 19, 2025, 5:00-5:30 PM)
-
-**Mission:** Test scanner app end-to-end, plan companion pantry viewing app
-**Duration:** 30 minutes
-**Status:** ✅ **COMPLETE**
-
-### What We Accomplished
-
-#### 1. End-to-End Testing Verified ✅
-- **Test #1:** Bush's Black Beans (0039400018834)
-  - Triple API integration working perfectly
-  - All data sources responded: Nutritionix ✅ UPCitemdb ✅ Open Food Facts ✅
-  - Package size parsed: 15 oz
-  - Health scores captured: Nutri-Score (a), NOVA (3), dietary flags (vegan, vegetarian)
-  - Environmental data: Can packaging, USA origin
-  - Data saved to `inventory_items` table successfully
-- **Test #2:** Different product tested, all systems operational
-- Metro bundler running stable
-- Edge function responding correctly (version 5)
-- OCR attempting date recognition, manual entry working as expected
-
-#### 2. Momma B's Pantry App - Architecture Designed 🎨
-
-**Purpose:** Separate web app for viewing and managing inventory (no scanner needed)
-
-**Core Use Case:**
-1. User searches: "Do I have beans?"
-2. App shows: Bush's Black Beans with photo for visual recognition
-3. User sees: Storage location (Pantry), expiration date, quantity
-4. User finds can in physical pantry using photo reference
-5. After using in recipe: Tap "Mark as Used"
-6. Backend archives item to `inventory_history` for analytics
-
-**MVP Features (Phase 1):**
-- 🔍 Search inventory by keywords (product name, brand)
-- 📋 View inventory list with photos
-- 🖼️ Item detail view (photo, location, expiration, quantity, health scores)
-- ✅ "Mark as Used" button (one tap archives with defaults)
-- 🏷️ Filter by storage location (Pantry, Fridge, Freezer, etc.)
-
-**Scalable Architecture (Future Phases):**
-- Phase 2: Edit item details (quantity, expiration, location)
-- Phase 3: Partial consumption tracking (volume_remaining)
-- Phase 4: Shopping list generation from consumed items
-- Phase 5: Analytics dashboard (consumption patterns, waste analysis)
-- Phase 6: Expiration alerts and notifications
-
-**Tech Stack Decision:**
-```
-Platform:     Next.js 14 (App Router) - works on phone + computer browser
-Database:     Supabase (same instance as scanner app)
-UI:           Tailwind CSS + shadcn/ui components
-Auth:         Supabase Auth (household-based, same as scanner)
-Search:       Supabase queries with text matching
-Deployment:   Vercel (free tier, accessible from anywhere)
-```
-
-**Why Next.js Web App vs React Native:**
-- ✅ Works on computer AND phone (user requirement)
-- ✅ No app store deployment needed
-- ✅ Faster to build and iterate
-- ✅ Can be installed as PWA on phone
-- ✅ Scanner app stays lightweight and camera-focused
-- ✅ Separate concerns: scanning vs viewing/managing
-
-**Database - Already Ready:**
-- `inventory_items` table has all data (100+ fields)
-- `inventory_history` table ready for archived items
-- `archive_inventory_item()` function ready to use
-- Photos available (`photo_thumb`, `photo_highres`)
-- Health scores, dietary flags, package sizes all captured
-
-**User Experience Design:**
-```
-Home Screen:
-┌─────────────────────────────────┐
-│ Momma B's Pantry       🔍 Search│
-├─────────────────────────────────┤
-│ 🔴 Expiring Soon (3 items)      │
-├─────────────────────────────────┤
-│ Filters: [All] [Pantry] [Fridge]│
-├─────────────────────────────────┤
-│ ┌─────────────────────────────┐ │
-│ │ 🖼️ Bush's Black Beans       │ │
-│ │    Pantry • Expires Oct 27  │ │
-│ │    15 oz • Nutri-Score: A   │ │
-│ └─────────────────────────────┘ │
-└─────────────────────────────────┘
-
-Detail Screen:
-┌─────────────────────────────────┐
-│ ← Back                          │
-├─────────────────────────────────┤
-│      [Product Photo]            │
-│ Bush's Black Beans              │
-│ Bush's Best                     │
-│                                 │
-│ 📍 Location: Pantry             │
-│ 📅 Expires: Oct 27, 2025        │
-│ 📦 Size: 15 oz                  │
-│ 🏷️ Nutri-Score: A (Healthy)     │
-│ 🌱 Vegan • Vegetarian           │
-│                                 │
-│ [Mark as Used]                  │
-└─────────────────────────────────┘
-```
-
-**Mark as Used Behavior (MVP):**
-- One tap action (no additional prompts for MVP)
-- Backend calls: `archive_inventory_item(item_id, today's_date, 'consumed', null)`
-- Item moves from `inventory_items` → `inventory_history`
-- Item disappears from active inventory list
-- Analytics can be run on history table later
-
-### 🎯 Design Decisions
-
-1. **Start Simple, Build Scalable**
-   - MVP: Search, view, mark as used (core workflow only)
-   - Architecture supports future features without refactoring
-   - Database already has all fields needed for advanced features
-
-2. **Two Separate Apps Strategy**
-   - **Scanner App (React Native):** Barcode scanning + camera OCR (mobile-only)
-   - **Pantry App (Next.js):** View + manage inventory (phone + computer)
-   - Shared backend (Supabase), single source of truth
-
-3. **Photo-First Design**
-   - Visual recognition is key use case
-   - Large photos help identify items in crowded pantry
-   - Nutritionix photos are high quality
-
-4. **One-Tap Actions**
-   - Keep MVP simple: "Mark as Used" = one tap
-   - No forms, no date pickers, no notes (for MVP)
-   - Can add optional fields in Phase 2
-
----
-
-## 🚀 Previous Session: Triple API Integration (Oct 19, 2025, 9:00-9:40 AM)
-
-**Mission:** Deploy Triple API Integration
-**Duration:** 40 minutes
-**Status:** ✅ **COMPLETE**
-
-### What We Accomplished
-
-#### 1. Migrations Deployed
-- Extended schema with 70+ new fields (package, pricing, health, environmental)
-- Product catalog table with caching functionality
-- Analytics helper functions (health_score, price_trends)
-- All function security fixes applied
-
-#### 2. Triple API Integration Implemented
-- **Nutritionix API** - Already working (36 nutrition fields)
-- **UPCitemdb API** - Added package size parsing from product titles
-- **Open Food Facts API** - Added health scores, dietary flags, environmental data
-
-#### 3. Data Extraction Working
-- ✅ Package size: "15 oz" parsed from UPCitemdb title
-- ✅ Health scores: Nutri-Score (a), NOVA (3), Eco-Score
-- ✅ Dietary flags: Vegan (true), Vegetarian (true), Palm-oil-free
-- ✅ Environmental: Packaging (Can), Origin (United States)
-- ✅ Allergens: Captured from Open Food Facts
-
-#### 4. Product Catalog Caching Operational
-- First scan: Calls all 3 APIs, saves to product_catalog
-- Second scan: Instant lookup from catalog (no API calls)
-- Rate limit management: Avoids hitting UPCitemdb 100/day cap
-
-#### 5. Testing Verified
-- Test product: Bush's Black Beans (0039400018834)
-- All 3 APIs returned data successfully
-- Health scores displaying correctly in database
-- Catalog lookup working on second scan
-
-### 🔬 Test Results
-
-```bash
-Bush's Black Beans (0039400018834):
-├─ Nutritionix API ✅
-│  ├─ Nutrition: 120 cal, 8g protein, 22g carbs
-│  ├─ Serving: 0.5 cup (130g)
-│  └─ Photo URLs: thumb + highres
-├─ UPCitemdb API ✅
-│  ├─ Package: 15 oz (parsed from title)
-│  └─ Title: "BUSH'S Black Beans, Reduced Sodium 15 oz"
-└─ Open Food Facts API ✅
-   ├─ Nutri-Score: a (best health rating)
-   ├─ NOVA Group: 3 (processed food)
-   ├─ Eco-Score: unknown
-   ├─ Vegan: true
-   ├─ Vegetarian: true
-   ├─ Packaging: Can
-   └─ Origin: United States
-```
-
-### 🎨 Example Data Captured
-
-**Before (Nutritionix only):**
-```json
-{
-  "food_name": "Black Beans, Reduced Sodium",
-  "brand_name": "Bush's Best",
-  "nf_calories": 120,
-  "nf_protein": 8,
-  "package_size": null,  // ❌ Missing
-  "nutriscore_grade": null,  // ❌ Missing
-  "is_vegan": null  // ❌ Missing
-}
-```
-
-**After (Triple API):**
-```json
-{
-  "food_name": "Black Beans, Reduced Sodium",
-  "brand_name": "Bush's Best",
-  "nf_calories": 120,
-  "nf_protein": 8,
-  "package_size": 15,  // ✅ From UPCitemdb
-  "package_unit": "oz",  // ✅ From UPCitemdb
-  "nutriscore_grade": "a",  // ✅ From Open Food Facts
-  "nova_group": 3,  // ✅ From Open Food Facts
-  "is_vegan": true,  // ✅ From Open Food Facts
-  "is_vegetarian": true,  // ✅ From Open Food Facts
-  "packaging_type": "Can",  // ✅ From Open Food Facts
-  "origins": "United States"  // ✅ From Open Food Facts
-}
-```
-
-### 📝 Files Modified
-
-**Edge Function:**
-- `supabase/functions/scanner-ingest/index.ts`
-  - Added Open Food Facts API integration
-  - Added `extractOpenFoodFactsData()` helper
-  - Updated catalog save to include OFF data
-  - Updated inventory insert with health scores
-
-**Migrations (Deployed):**
-- `20251018160000_add_extended_product_fields.sql` ✅
-- `20251019000000_create_product_catalog.sql` ✅
-- `20251019000100_fix_function_security.sql` ✅
-- `20251019000200_fix_function_errors.sql` ✅
-
-**Test Scripts Created:**
-- `test_health_scores.js` - Verify health data in database
-
-### 💡 Key Learnings
-
-1. **Multi-API Strategy Works**
-   - No single API has complete data
-   - Combining 3 APIs gives maximum product intelligence
-   - Graceful fallbacks ensure app never breaks
-
-2. **Caching is Critical**
-   - UPCitemdb has 100/day rate limit
-   - Product catalog solves this completely
-   - Second scans are instant (no API calls)
-
-3. **Package Size is Fragile**
-   - No API provides structured package size
-   - Must parse from text fields (UPCitemdb title)
-   - User verification is essential for accuracy
-
-4. **Open Food Facts is Rich**
-   - 227 fields available
-   - Nutri-Score and NOVA are valuable for health insights
-   - Vegan/vegetarian detection from ingredients analysis
-
-### 🔍 Analytics Potential Unlocked
-
-**Health & Diet:**
-- "How healthy is my pantry?" (avg Nutri-Score)
-- "What % ultra-processed?" (NOVA group 4 count)
-- "Vegan/vegetarian breakdown"
-- "Allergen alerts"
-
-**Environmental:**
-- "My carbon footprint" (Eco-Score)
-- "Packaging waste" (% cans vs bottles)
-- "Local vs imported" (% USA origin)
-
-**Shopping Optimization:**
-- "Price tracking" (Walmart vs Target)
-- "Best time to buy" (price trends)
-- "Average cost per category"
-
-**Consumption Insights:**
-- "What brands do I buy most?"
-- "Days to consume per category"
-- "Waste analysis" (expired vs consumed)
-- "Reorder predictions"
-
-### ✅ Success Metrics
-
-- **APIs Integrated:** 3/3 (Nutritionix, UPCitemdb, Open Food Facts)
-- **Fields Captured:** 100+ per product (up from 36)
-- **Caching Working:** ✅ Second scans instant
-- **Health Scores:** ✅ Nutri-Score, NOVA, dietary flags
-- **Package Parsing:** ✅ 15 oz from title
-- **Migrations Deployed:** ✅ All 4 migrations
-- **Tests Passing:** ✅ All test scripts successful
-- **Production Ready:** ✅ Edge function deployed
-
-**Session Stats:**
-- Duration: 40 minutes
-- Database Changes: 70+ new columns, 1 new table, 5 new functions
-- API Calls During Testing: 3 scans (1 fresh, 2 cached lookups)
-
-### 🚀 Next Steps (Priority Order)
+## 🚀 Next Steps (Priority Order)
 
 **🔥 HIGHEST PRIORITY - Momma B's Pantry App (NEW):**
 
@@ -1233,334 +820,97 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 
 ---
 
-## 🔄 Quad API Strategy for Maximum Product Data (Nov 7, 2025 - UPDATED)
+## 🔄 Current API Strategy (Nov 9, 2025)
 
-### Evolution: From Nutritionix to Multi-Source Free APIs
+### Scanner: Two-API Approach
 
-**Original (Oct 2025):** Triple API (Nutritionix + UPCitemdb + Open Food Facts)
-**Updated (Nov 2025):** Quad API (USDA + UPCitemdb + Open Food Facts + Manual)
+**During Scanning (Fast Ingestion):**
+1. **Product Catalog** - Check cache first (instant)
+2. **Open Food Facts** - Nutrition, health scores, photos, dietary flags (UNLIMITED free)
+3. **UPCitemdb** - Package sizes from titles, pricing data (100/day free)
+4. **Manual Entry** - Fallback if APIs fail
 
-**Why the Change:**
-- Nutritionix subscription expired ($499/month paid tier required)
-- Free tier not sufficient for production use
-- USDA FoodData Central provides equal or better government data
-- Multi-source approach improves data quality and resilience
+**USDA Fuzzy Matching:**
+- Scanner edge function captures USDA fuzzy matches (top 3) with confidence scores
+- Stored in `usda_fuzzy_matches` JSONB field + `usda_match_validations` table
+- User validates later in Pantry Desktop app (on-demand enrichment)
+- Avoids slowing down physical scanning workflow
+- See [Pantry HANDOFF.md](../momma-bs-pantry/HANDOFF.md) for validation workflow
 
-### The Solution: Quad API Strategy with Data Provenance
+### Multi-Source Data Storage
 
-**Decision:** Capture data from ALL free sources, store separately, choose best value per field
+**Philosophy:** "Capture Everything, Show the Best"
 
-**Architecture:**
-```
-Barcode Scan Flow:
-1. Check product_catalog → Skip APIs if cached (FAST)
-2. Call USDA FoodData Central → Government nutrition data
-3. Call UPCitemdb API → Package data (size, weight, dimensions) + Pricing
-4. Call Open Food Facts API → Health scores, environmental data, dietary tags
-5. Store ALL sources separately → Enable comparison and override
-6. Select best value per field → Display in UI
-7. Fallback: Manual entry if all APIs fail
-```
-
-**Why Quad API?**
-
-**USDA FoodData Central** - ✅ NEW! (Replacing Nutritionix)
-- ✅ FREE - 1,000 requests/hour
-- ✅ Government nutrition data (highest quality)
-- ✅ Branded foods database (UPC/GTIN lookup)
-- ✅ Public domain data (CC0 license)
-- ✅ Comprehensive nutrient profiles
-- ✅ API: `https://api.nal.usda.gov/fdc/v1/foods/search?query={barcode}`
-
-**UPCitemdb (18 fields)** - Existing
-- ✅ 495 million products
-- ✅ FREE tier: 100 requests/day
-- ✅ Package size (parsed from title: "15 oz")
-- ✅ Pricing history & current offers
-- ✅ Physical dimensions
-- ✅ Amazon ASIN
-
-**Open Food Facts (227 fields!)** - Existing
-- ✅ UNLIMITED free tier
-- ✅ Nutri-Score grade (A-E health rating)
-- ✅ NOVA group (1-4 processing level)
-- ✅ Eco-Score (environmental impact)
-- ✅ Dietary tags (vegan, vegetarian, palm-oil-free)
-- ✅ Allergen information
-- ✅ Product photos (extensive image database)
-- ✅ Packaging type & recyclability
-- ✅ Country of origin
-
-**Data Storage Strategy (Multi-Source Columns):**
 ```sql
--- Example: Calories from each source
-usda_calories DECIMAL,        -- Government data
-off_calories DECIMAL,         -- Community data
-upc_calories DECIMAL,         -- Commercial data (if available)
+-- Store each source separately
+off_calories DECIMAL,      -- Open Food Facts
+upc_calories DECIMAL,      -- UPCitemdb
+usda_calories DECIMAL,     -- USDA (after Pantry validation)
 
--- Single Source of Truth (displayed)
-nf_calories DECIMAL           -- Auto-selected best value
-
--- Raw API responses (debugging)
-usda_raw_data JSONB
-openfoodfacts_raw_data JSONB
-upcitemdb_raw_data JSONB
-```
-
-**Smart Selection Logic:**
-```javascript
-// Prefer government > community > commercial
-nf_calories = usda_calories ?? off_calories ?? upc_calories ?? null
-```
-
-### Package Size Challenge & Solution
-
-**Discovery (Oct 18, 4:20 PM):**
-After testing all available APIs, we found that **NO API provides structured package size data**:
-- All APIs only have serving sizes or package sizes embedded in text fields
-- UPCitemdb has best data but in title: "BUSH'S Reduced Sodium Black Beans **15 oz**"
-- Regex parsing is fragile (breaks with "15oz" vs "15 oz" vs "425g")
-
-**Solution: Multi-Layer Detection + User-Verified Catalog**
-Instead of relying on one brittle approach, we use **5 priority layers** with user confirmation:
-1. Our `product_catalog` (previously scanned/verified)
-2. Open Food Facts validation
-3. Smart regex parsing (multiple patterns)
-4. OCR package label
-5. Manual entry
-
-Every scan shows: **"We found: 15 oz - Is this correct?"** allowing user verification.
-Corrections are saved to `product_catalog` so the system learns and improves over time.
-
-### Extended Database Schema (70+ new fields!)
-
-**Migration created:** `20251018160000_add_extended_product_fields.sql`
-
-**Additional table needed:** `product_catalog`
-```sql
-CREATE TABLE product_catalog (
-  barcode TEXT PRIMARY KEY,
-  package_size DECIMAL,
-  package_unit TEXT,
-  servings_per_container DECIMAL,
-  verified_by_user BOOLEAN DEFAULT true,
-  verified_at TIMESTAMP DEFAULT now(),
-  verification_count INTEGER DEFAULT 1,
-  last_seen TIMESTAMP DEFAULT now()
-);
-```
-Purpose: Store user-verified package sizes for instant lookup on future scans.
-
-**Package Information (UPCitemdb):**
-- `package_size`, `package_unit` (parsed from title: "15 oz")
-- `package_weight` ("3 Pounds")
-- `package_dimensions` ("10 X 4 X 5 inches")
-- `asin` (Amazon identifier)
-- `model_number`
-
-**Pricing Data (UPCitemdb):**
-- `current_price`, `lowest_recorded_price`, `highest_recorded_price`
-- `price_history` (JSONB - historical data)
-- `price_retailers` (JSONB - current offers from Walmart, Target, etc.)
-
-**Health Scores (Open Food Facts):**
-- `nutriscore_grade` (a-e: health rating)
-- `nova_group` (1-4: processing level)
-- `ecoscore_grade` (a-e: environmental impact)
-- `nutrient_levels` (JSONB: {fat: "low", salt: "moderate"})
-
-**Dietary Information (Open Food Facts):**
-- `is_vegan`, `is_vegetarian`, `is_palm_oil_free` (boolean flags)
-- `allergens` (allergen warnings)
-- `traces` (trace allergens)
-
-**Labels & Certifications (Open Food Facts):**
-- `labels` ("Low salt, Reduced sodium")
-- `labels_tags` (JSONB: ["en:low-salt", "en:organic"])
-
-**Environmental Data (Open Food Facts):**
-- `packaging_type` ("Can", "Bottle", "Box")
-- `packaging_tags` (JSONB: ["en:can", "en:recyclable"])
-- `manufacturing_places` ("USA")
-- `origins` (country of origin)
-- `countries` (distribution countries)
-
-**Product Categorization:**
-- `category_path` (full category tree from UPCitemdb)
-- `product_color`
-
-**API Source Tracking:**
-- `data_sources` (JSONB: {nutritionix: true, upcitemdb: true, openfoodfacts: true})
-
-### Implementation Plan (UPDATED Oct 19, 2025)
-
-**External Review (ChatGPT Assessment):**
-> ✅ Roadmap is sound - schema ready, Nutritionix working, triple API strategy is logical
-> ⚠️ Deploy migration FIRST before updating edge function (columns must exist before API data)
-> ⚠️ UPCitemdb rate limit (100/day) requires caching via `product_catalog` table
-> ⚠️ Instrument analytics helpers early to validate data quality from new APIs
-> ✅ Multi-layer package detection is good hedge against inconsistent source data
-> 📋 Test migration on staging/local first, expand edge function incrementally
-
-**Phase 1: Extended Schema ✅ DONE**
-- Created migration with 70+ new fields
-- Added to both `inventory_items` and `inventory_history` tables
-- Created analytics helper functions
-- Added indexes for common queries
-
-**Phase 2: Multi-Layer Package Size Detection Strategy**
-
-**The Problem:**
-No API provides reliable structured package size data:
-- Nutritionix: Only has `serving_weight_grams` (130g serving, not 15 oz package)
-- UPCitemdb: `size` field is empty, package size only in `title` ("BUSH'S... 15 oz")
-- Open Food Facts: `product_quantity` shows serving size, not package size
-- Barcode Lookup: Business API (not free), app shows size but no API access
-
-**The Solution: Multi-Layer Approach (Priority Order)**
-
-```javascript
-Priority 1: Check our product_catalog table
-  → If we've seen this barcode before, use our saved data
-  → Fastest, most reliable (user-verified)
-
-Priority 2: Try Open Food Facts product_quantity
-  → Validate it makes sense (compare to serving_weight_grams)
-  → Sometimes correct, sometimes just serving size
-
-Priority 3: Parse UPCitemdb title with smart regex
-  → Multiple patterns: "15 oz", "425g", "1.5 lbs", etc.
-  → Extract both number and unit
-  → Fallback patterns for edge cases
-
-Priority 4: OCR the package label (like expiration dates)
-  → User takes photo of "NET WT 15 OZ" text
-  → Works for non-barcoded items too
-  → More reliable than title parsing
-
-Priority 5: Manual entry
-  → User types package size and unit
-  → Always works, always accurate
-
-Confirmation UI (always shown):
-  → "We found: 15 oz - Is this correct? [Edit]"
-  → User can verify/correct before saving
-  → Corrections saved to product_catalog for future scans
+-- Single source of truth (displayed)
+nf_calories DECIMAL        -- Auto-selected: COALESCE(usda, off, upc)
 ```
 
 **Benefits:**
-- ✅ Fast for repeat products (our catalog lookup)
-- ✅ Automated when possible (Open Food Facts, title parsing)
-- ✅ OCR option (works for any package, even non-barcoded)
-- ✅ Manual fallback (100% success rate)
-- ✅ User verification (catch API errors)
-- ✅ Self-improving (builds catalog over time)
-- ✅ No regex fragility (multiple fallbacks)
+- Know data provenance (which API provided what)
+- Compare sources for quality control
+- User can override with preferred source
+- No data loss - all sources preserved
+- Future-proof (easy to add new APIs)
 
-**Phase 3: Deploy Extended Schema (PRIORITY #1)**
-- ⚠️ **MUST DO FIRST** - Run migration before updating edge function
-- Test migration locally: `supabase db reset` to verify
-- Deploy to production: `supabase db push`
-- Verify existing scans still work (backward compatibility)
-- Confirm all new columns exist with correct types
+### Package Size Detection
 
-**Phase 4: Implement Caching for Rate Limits (PRIORITY #2)**
-- Create `product_catalog` table migration
-- Add lookup logic: check catalog BEFORE calling APIs
-- Cache strategy:
-  - First scan of barcode → Call APIs, save to catalog
-  - Subsequent scans → Use catalog data (instant, no API calls)
-  - User corrections → Update catalog with verified data
-- This solves UPCitemdb 100/day bottleneck
+**Priority Order:**
+1. **Product Catalog** - Previously verified sizes (fastest, most accurate)
+2. **Open Food Facts** - `product_quantity` field
+3. **UPCitemdb Title Parsing** - Regex: "15 oz", "425g", etc.
+4. **Manual Entry** - User types size
 
-**Phase 5: Triple API Integration (Incremental)**
-- **Step 1:** Add UPCitemdb API call to edge function
-  - Parse title for package size (regex with multiple patterns)
-  - Extract pricing data
-  - Handle API failures gracefully
-  - Test with 10-20 products
-- **Step 2:** Add Open Food Facts API call
-  - Extract health scores (Nutri-Score, NOVA, Eco-Score)
-  - Parse ingredients_analysis for dietary flags
-  - Handle missing data (not all products in OFF database)
-  - Test with same products from Step 1
-- **Step 3:** Merge all three datasets
-  - Combine Nutritionix + UPCitemdb + Open Food Facts
-  - Set `data_sources` JSONB to track which APIs succeeded
-  - Save to `inventory_items` with full extended schema
-- **Step 4:** Implement multi-layer package size detection
-  - Priority 1: Check product_catalog
-  - Priority 2: Try Open Food Facts product_quantity
-  - Priority 3: Parse UPCitemdb title (smart regex)
-  - Priority 4: Manual entry fallback
-  - Always show confirmation UI
+**All sizes flow through catalog** for instant future lookups.
 
-**Phase 6: Analytics Helpers (Data Validation)**
-- Build SQL functions in `supabase/migrations/`:
-  - `get_household_health_score(household_id)` → avg Nutri-Score, NOVA, vegan %
-  - `get_price_trends(barcode, days)` → min/max/avg pricing
-  - `get_waste_rate(household_id, period)` → % expired vs consumed
-  - `get_expiring_soon(household_id, days)` → items expiring within N days
-- Test helpers with real data to validate API integration quality
-- Expose via Supabase RPC for app to call
+### Visual Identification for Items Without Barcodes (Planned)
 
-**Phase 7: Enhanced UI**
-- Package size confirmation: "We found: 15 oz - Is this correct? [Edit]"
-- Show data source badges: "From our catalog ✓" vs "Parsed from title ⚠️"
-- Health score badges (Nutri-Score: A-E color-coded)
-- Dietary tag icons (vegan 🌱, vegetarian 🥗, organic ♻️)
-- Price display (if available from UPCitemdb)
-- Allow user corrections (save to product_catalog for future)
+**Purpose:** Scan produce, bulk items, and homemade foods using AI vision
 
-### API Usage Estimates
+**Workflow:**
+1. User taps "Scan by Photo" (new button alongside barcode scan)
+2. Take photo of item (e.g., apple, bulk nuts, homemade cookies)
+3. **AI identifies product** using OpenAI GPT-4 Vision
+   - Example: "Red apple, likely Fuji or Gala variety"
+4. User sees editable suggestion: `[Fuji Apple]` with Edit button
+5. User confirms or corrects identification
+6. System searches USDA by confirmed name
+7. Show top 3 USDA matches with photos (fuzzy matching)
+8. User selects correct match
+9. Proceed to expiration/location entry as normal
 
-**Current inventory scenario:**
-- ~300-500 unique products (hundreds of cans, bottles, spices)
-- Initial scan: 100/day (UPCitemdb bottleneck) = ~5 days to scan everything
-- Ongoing: ~5-10 new products per week (well within free tier)
+**Technical Implementation:**
+- **AI Service:** OpenAI GPT-4 Vision API
+- **Prompt:** "Identify this food item. Provide common name and variety if applicable. Be specific for produce (e.g., 'Fuji Apple' not just 'Apple')."
+- **Photo Storage:** Upload to Supabase Storage, store URL in `photo_user_uploaded`
+- **Barcode Generation:** `PHOTO-{timestamp}` for items without UPCs
+- **USDA Integration:** Use existing fuzzy matching logic with AI-suggested name
 
-**API Rate Limits:**
-- Nutritionix: Existing free tier
-- UPCitemdb: 100/day (bottleneck but sufficient)
-- Open Food Facts: UNLIMITED
+**Benefits:**
+- ✅ Scan produce without PLU stickers
+- ✅ Track bulk bin purchases (nuts, grains, candy)
+- ✅ Log homemade/leftover foods
+- ✅ Handle international products without UPC
+- ✅ Backup option when barcode won't scan
 
-**Conclusion:** All free tiers are sufficient, zero additional costs!
+**Edge Cases:**
+- AI can't identify → Falls back to manual text entry
+- AI wrong → User corrects before USDA search
+- No USDA match → Manual nutrition entry (future feature)
+- Blurry photo → Prompt user to retake
 
-### Future Analytics Enabled
-
-**Health & Diet:**
-- "How healthy is my pantry?" (avg Nutri-Score: B+)
-- "What % ultra-processed?" (NOVA group 4 count)
-- "Vegan/vegetarian breakdown" (35% vegan, 60% vegetarian)
-- "Allergen alerts" (notify if allergens detected)
-
-**Environmental:**
-- "My carbon footprint" (Eco-Score average)
-- "Packaging waste" (% cans vs bottles vs boxes)
-- "Local vs imported" (% USA origin)
-
-**Shopping Optimization:**
-- "Price tracking" (Walmart $1.25 vs Target $1.39)
-- "Best time to buy" (historical price trends)
-- "Average cost per category"
-- "Spending patterns over time"
-
-**Consumption Insights:**
-- "What brands do I buy most?"
-- "Days to consume per category"
-- "Waste analysis" (expired vs consumed)
-- "Reorder predictions"
-
-### Benefits
-
-- ✅ **Maximum data:** 281+ total fields (36 + 18 + 227) across all APIs
-- ✅ **100% Free:** All three APIs have sufficient free tiers
-- ✅ **Health insights:** Nutri-Score, NOVA, allergens, dietary tags
-- ✅ **Environmental:** Eco-Score, packaging, origin tracking
-- ✅ **Price intelligence:** Historical pricing, multi-retailer comparison
-- ✅ **Resilient:** Three data sources + manual entry fallback
-- ✅ **Analytics-ready:** SQL functions for instant insights
-- ✅ **Scalable:** Can upgrade UPCitemdb if needed (currently free is enough)
+**UI Location:** Main scan screen with two options:
+```
+┌─────────────────────────────┐
+│   [Scan Barcode]            │  ← Existing
+│   [Scan by Photo] 📷        │  ← New
+└─────────────────────────────┘
+```
 
 ---
 
