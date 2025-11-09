@@ -487,10 +487,13 @@ serve(async (req) => {
       console.log('Manual entry:', product_name, 'Storage:', storage_location_id)
 
       // Create inventory item with minimal data
+      // Generate a unique barcode for manual entries (format: MANUAL-timestamp)
+      const manualBarcode = barcode || `MANUAL-${Date.now()}`
+
       const { data: inventoryItem, error: inventoryError } = await supabaseClient
         .from('inventory_items')
         .insert({
-          barcode: barcode || null,
+          barcode: manualBarcode,
           storage_location_id: storage_location_id,
           household_id: '7c093e13-4bcf-463e-96c1-9f499de9c4f2', // TODO: Get from user context
           food_name: product_name,
@@ -498,13 +501,25 @@ serve(async (req) => {
           expiration_date: expiration_date,
           notes: notes || null,
           status: 'active',
+          volume_remaining: 100, // Default to 100% for manual entries
         })
         .select()
         .single()
 
       if (inventoryError) {
+        await dbLog(supabaseClient, 'error', 'Manual entry database error', inventoryError, null)
         console.error('Manual entry database error:', inventoryError)
-        throw inventoryError
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: inventoryError.message,
+            details: inventoryError
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        )
       }
 
       console.log('Manual entry complete, item_id:', inventoryItem.id)
