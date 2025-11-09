@@ -4,11 +4,11 @@
     "slug": "mommas-scanner",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "nutritionscanner",
+    "scheme": "momma-b-scanner",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "icon": "./assets/images/icon.png",
-    "description": "Scan barcodes to track nutrition information and organize your pantry",
+    "description": "Scan barcodes to track pantry inventory and manage your kitchen",
     "platforms": [
       "ios",
       "android"
@@ -19,14 +19,13 @@
       "buildNumber": "1",
       "appleTeamId": "9VXGGDHF22",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera to scan product barcodes for nutrition tracking.",
+        "NSCameraUsageDescription": "This app uses the camera to scan product barcodes and expiration dates for kitchen inventory management.",
         "NSPhotoLibraryUsageDescription": "This app may access your photo library to scan barcodes from images.",
         "NSLocalNetworkUsageDescription": "This app requires local network access to connect to the development server for live updates during development.",
+        "NSLocationWhenInUseUsageDescription": "This app does not access your location. This permission is required by a third-party library.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app does not access your location. This permission is required by a third-party library.",
         "NSBonjourServices": [
           "_expodev._tcp"
-        ],
-        "UIBackgroundModes": [
-          "background-processing"
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -37,7 +36,7 @@
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "package": "com.mommabsscanner.app",
+      "package": "com.werablr.momma_b_scanner",
       "versionCode": 1,
       "permissions": [
         "CAMERA",
