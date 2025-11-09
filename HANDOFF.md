@@ -24,7 +24,11 @@
 **Current API Performance:**
 - ✅ **Open Food Facts** - Working perfectly (nutrition, photos, health scores, dietary flags)
 - ✅ **UPCitemdb** - Working perfectly (package sizes)
-- ⚠️ **USDA FoodData Central** - Not returning data (investigation pending, not blocking)
+- ⚠️ **USDA FoodData Central** - Low exact barcode match rate (~0% for current products)
+  - **Root Cause Identified (Nov 9):** USDA branded database has limited UPC coverage
+  - **Example:** Scanned `0039400018834` (Bush's) → Not in USDA, but USDA has `00039400018803` (different variant)
+  - **Data Quality:** When USDA matches, provides valuable micronutrients (Calcium, Iron, Potassium) that OFF lacks
+  - **Next Step:** Implementing fuzzy name-based matching with confidence scoring + user validation
 
 **Recent Session (Nov 9, 2025):**
 - 10 items successfully scanned with barcodes
@@ -131,27 +135,37 @@ Exact barcode match fails → Discard API data → Move to next API
 Exact barcode match fails → Name-based fuzzy search → Capture top 3 matches with metadata → Flag for user verification → Learn from corrections
 ```
 
-### Fuzzy Matching Strategy
+### Fuzzy Matching Strategy (PLANNED - Nov 9, 2025)
+
+**Status:** 🔜 Next feature to implement (USDA exact match rate is ~0%, fuzzy matching will improve coverage)
 
 **When triggered:**
-1. Exact barcode lookup fails in any API (USDA, OFF, UPC)
-2. User initiates validation in Desktop Pantry app (future)
+1. Exact barcode lookup fails in USDA API
+2. Product name available from UPCitemdb or OFF
+3. User initiates validation in Desktop Pantry app
 
 **What we capture:**
-- Top 3 name-based search results from each API
+- Top 3 name-based search results from USDA
 - Each result includes: `matched_upc`, `match_score`, `api_nutrition_data`
 - Flag: `requires_verification: true`, `match_type: 'fuzzy_name'`
+- Confidence score: String similarity between product names (0-100)
 
 **Example flow:**
-1. Scan `0039400018834` → USDA exact barcode fails
+1. Scan `0039400018834` → USDA exact barcode fails ✗
 2. Get product name from UPCitemdb: "Bush's Black Beans"
-3. Search USDA by name: Returns 3 results with different UPCs
-4. Capture all 3 with scores:
-   - `0039400018957` (score: 95.2)
-   - `0039400019001` (score: 89.4)
-   - `0039400018844` (score: 87.1)
-5. Store nutrition data from all 3, flagged as unverified
-6. User validates in Desktop Pantry app later
+3. Search USDA by name "Bush Black Beans": Returns 66,000+ results
+4. Calculate string similarity scores for top 10 results
+5. Capture top 3 best matches with confidence:
+   - `00039400018803` "Bush's Black Beans 15 oz" (score: 95.2)
+   - `00039400018827` "Bush's Black Beans 26.5 oz" (score: 92.1)
+   - `00039400018797` "Bush's Black Beans 39 oz" (score: 91.8)
+6. Store USDA nutrition data from best match, flagged as unverified
+7. User validates in Desktop Pantry app later
+
+**Why This Matters:**
+- USDA provides **Calcium, Iron, Potassium** that OFF doesn't have
+- Currently discarding valuable micronutrient data due to UPC mismatches
+- User validation ensures data accuracy while capturing more information
 
 ### UPC Alias Database
 
@@ -2078,35 +2092,46 @@ RETURNS TABLE(
 
 ## 🔜 What's Next (Priority Order)
 
-### Immediate (This Session)
+### Immediate (Completed Nov 9, 2025)
 1. ✅ **COMPLETED** - Fixed network connectivity issues (deprecated columns, RLS, ecoscore validation)
 2. ✅ **COMPLETED** - Verified multi-source strategy working (OFF + UPC)
-3. ⏳ **NEXT** - Investigate USDA API (why no data returned?)
-   - Test USDA API directly with curl
-   - Check if USDA has branded products in database
-   - Review edge function USDA API call code
-   - Decision: Fix USDA or rely on OFF as primary source
+3. ✅ **COMPLETED** - Investigated USDA API issue
+   - **Root Cause:** USDA branded database has limited UPC coverage (~0% match rate for tested products)
+   - **Tested:** API is functional, returns data for name searches
+   - **Example:** Bush's Black Beans in USDA with different UPCs (`00039400018803` not `0039400018834`)
+   - **Data Value:** USDA provides Calcium, Iron, Potassium that OFF lacks
+   - **Decision:** Implement fuzzy name-based matching with confidence scoring + user validation
 
 ### Short-Term (Next 1-2 Weeks)
-4. **Continue internal testing** - Scan 20-50 household items
-5. **Document data quality issues** in TESTING.md
-6. **Review multi-source data display** in Pantry app (show provenance)
-7. **Add package size confirmation UI** (let user verify/correct)
+4. **🔜 PRIORITY: Implement USDA fuzzy matching**
+   - Add name-based search when exact barcode fails
+   - Calculate string similarity confidence scores
+   - Store top match with `requires_verification: true` flag
+   - Add confidence tracking fields to database
+5. **Continue internal testing** - Scan 20-50 household items
+6. **Document data quality issues** in TESTING.md
+7. **Review multi-source data display** in Pantry app (show provenance)
 
 ### Medium-Term (2-4 Weeks)
-8. **Polish Scanner UI** based on testing feedback
-9. **Add health score badges** in review screen
-10. **Deploy Pantry app updates** to show multi-source data
-11. **Prepare for App Store submission** when 50+ scans complete
+8. **Build Desktop Pantry validation UI**
+   - Side-by-side comparison of fuzzy USDA matches
+   - User validation: "Same product" or "Different product"
+   - UPC alias creation on confirmation
+   - Confidence score display
+9. **Add package size confirmation UI** in Scanner
+10. **Polish Scanner UI** based on testing feedback
+11. **Add health score badges** in review screen
+12. **Prepare for App Store submission** when 50+ scans complete
 
-### Investigation Needed
-- **USDA API**: Why returning no data? (usda_* columns all NULL)
-  - Possible: API key issue, wrong endpoint, products not in USDA DB
-  - Evidence: `data_sources.usda = false`, `has_usda_raw = "NO"`
-  - Impact: Currently falling back to Open Food Facts (acceptable, but USDA was goal)
+### USDA API Status (RESOLVED - Nov 9, 2025)
+- **Issue:** Low exact barcode match rate (~0% for current products)
+- **Root Cause:** USDA branded database UPC coverage gaps (different variants/sizes)
+- **Impact:** Missing valuable micronutrient data (Calcium, Iron, Potassium)
+- **Solution:** Fuzzy matching + user validation = capture more data safely
 
 ---
 
 **End of Handoff Document**
-**Status:** ✅ Fully Operational - 10 items scanned, manual entry fixed
-**Last Updated:** November 9, 2025, 12:00 PM
+**Status:** ✅ Fully Operational - 10 items scanned, USDA investigation complete
+**Last Updated:** November 9, 2025, 3:00 PM
+**Last Session:** USDA API investigation - Root cause identified, fuzzy matching solution planned
