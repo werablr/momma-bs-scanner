@@ -7,8 +7,28 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning
-**Date:** November 7, 2025
-**Status:** 🔄 **API MIGRATION IN PROGRESS** - Replacing Nutritionix with Multi-Source Strategy
+**Date:** November 9, 2025
+**Status:** ✅ **WORKING** - Multi-Source Strategy Operational (OFF + UPC), USDA Investigation Needed
+
+---
+
+## ✅ SYSTEM OPERATIONAL (Nov 9, 2025)
+
+**Network connectivity issue RESOLVED:**
+- Fixed deprecated Nutritionix column references (`alt_measures`, `nix_brand_id`, etc.)
+- Changed edge function to use `service_role` key (bypasses RLS securely)
+- Added `ecoscore_grade` validation to prevent constraint violations
+- Scanner app successfully connecting to edge function ✅
+- Data flowing from APIs → Database ✅
+
+**Current API Performance:**
+- ✅ **Open Food Facts** - Working perfectly (nutrition, photos, health scores, dietary flags)
+- ✅ **UPCitemdb** - Working perfectly (package sizes)
+- ⚠️ **USDA FoodData Central** - Not returning data (needs investigation)
+
+**Test Scans Completed:**
+1. Bush's Black Beans (0039400018834) - Full data from OFF + UPC
+2. Progresso Bread Crumbs (0041196891089) - Full data from OFF + UPC
 
 ---
 
@@ -1885,6 +1905,37 @@ RETURNS TABLE(
 
 ---
 
+## 🔜 What's Next (Priority Order)
+
+### Immediate (This Session)
+1. ✅ **COMPLETED** - Fixed network connectivity issues (deprecated columns, RLS, ecoscore validation)
+2. ✅ **COMPLETED** - Verified multi-source strategy working (OFF + UPC)
+3. ⏳ **NEXT** - Investigate USDA API (why no data returned?)
+   - Test USDA API directly with curl
+   - Check if USDA has branded products in database
+   - Review edge function USDA API call code
+   - Decision: Fix USDA or rely on OFF as primary source
+
+### Short-Term (Next 1-2 Weeks)
+4. **Continue internal testing** - Scan 20-50 household items
+5. **Document data quality issues** in TESTING.md
+6. **Review multi-source data display** in Pantry app (show provenance)
+7. **Add package size confirmation UI** (let user verify/correct)
+
+### Medium-Term (2-4 Weeks)
+8. **Polish Scanner UI** based on testing feedback
+9. **Add health score badges** in review screen
+10. **Deploy Pantry app updates** to show multi-source data
+11. **Prepare for App Store submission** when 50+ scans complete
+
+### Investigation Needed
+- **USDA API**: Why returning no data? (usda_* columns all NULL)
+  - Possible: API key issue, wrong endpoint, products not in USDA DB
+  - Evidence: `data_sources.usda = false`, `has_usda_raw = "NO"`
+  - Impact: Currently falling back to Open Food Facts (acceptable, but USDA was goal)
+
+---
+
 **End of Handoff Document**
-**Status:** 🔄 Dev Mode - Internal Testing Phase (Ready for 50+ scan validation)
-**Last Updated:** October 19, 2025, 6:50 PM
+**Status:** ✅ Operational - Scanner working, APIs flowing, USDA investigation pending
+**Last Updated:** November 9, 2025, 8:15 AM

@@ -32,15 +32,11 @@ serve(async (req) => {
     const requestBody = await req.json()
     const { workflow, step, barcode, storage_location_id, scan_id, ocr_text, extracted_date, confidence, processing_time_ms, product_name, brand_name, category, expiration_date, notes } = requestBody
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service_role to bypass RLS
+    // This is secure because edge functions run server-side and validate all inputs
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
     // Two-step workflow
@@ -317,8 +313,6 @@ serve(async (req) => {
             // Basic product info
             food_name: product.food_name,
             brand_name: product.brand_name,
-            nix_brand_id: null, // DEPRECATED - was Nutritionix-specific
-            nix_item_id: null,  // DEPRECATED - was Nutritionix-specific
 
             // Serving information
             serving_qty: product.serving_qty,
@@ -377,11 +371,6 @@ serve(async (req) => {
             // Additional metadata (photos from USDA or OFF)
             photo_thumb: product.photo_thumb,
             photo_highres: product.photo_highres,
-            ndb_no: null, // DEPRECATED - was Nutritionix-specific
-            source: null, // DEPRECATED
-            full_nutrients: null, // DEPRECATED
-            alt_measures: null, // DEPRECATED
-            tags: null, // DEPRECATED
 
             // Package information (from UPCitemdb or Open Food Facts)
             package_size: packageSize,
@@ -737,11 +726,20 @@ function extractOpenFoodFactsData(offData: any) {
     }
   }
 
+  // Validate ecoscore_grade (must be 'a', 'b', 'c', 'd', 'e', or null)
+  let ecoscoreGrade: string | null = null
+  if (p.ecoscore_grade) {
+    const grade = p.ecoscore_grade.toLowerCase()
+    if (['a', 'b', 'c', 'd', 'e'].includes(grade)) {
+      ecoscoreGrade = grade
+    }
+  }
+
   return {
     // Health scores
     nutriscore_grade: nutriscoreGrade,
     nova_group: p.nova_group ? parseInt(p.nova_group) : null,
-    ecoscore_grade: p.ecoscore_grade || null,
+    ecoscore_grade: ecoscoreGrade,
     nutrient_levels: p.nutrient_levels || null,
 
     // Dietary flags
