@@ -36,13 +36,13 @@
 
 **Issue:** Nutritionix subscription expired, $499/month paid tier required
 
-**Solution:** Multi-source free API strategy with complete data provenance
+**Solution:** Multi-source free API strategy with complete data provenance + fuzzy matching
 
 ### New API Architecture (Replacing Nutritionix)
 
-**Philosophy: Capture Everything, Show the Best**
+**Philosophy: Capture Everything, Show the Best, Validate Later**
 
-Instead of relying on one API, we now aggregate data from **all free sources** and track provenance:
+Instead of relying on one API, we now aggregate data from **all free sources**, track provenance, and handle UPC mismatches intelligently:
 
 ```
 PRIORITY 1: Check product_catalog (cached data - skip APIs)
@@ -94,6 +94,7 @@ nf_calories DECIMAL  -- Auto-selected: COALESCE(usda, off, upc)
 - Add columns: `usda_*`, `off_*` for all nutrients
 - Keep existing `nf_*` columns as SSoT (backward compatible)
 - Raw API responses: `usda_raw_data JSONB`, etc. (debugging)
+- UPC alias tracking: `upc_aliases` table for cross-references
 
 **Why Columns vs JSONB:**
 - Simple SQL queries: `WHERE nf_calories > 100`
@@ -102,6 +103,175 @@ nf_calories DECIMAL  -- Auto-selected: COALESCE(usda, off, upc)
 - Clear schema: Know exactly what data exists
 - No special syntax needed
 - 40-50 columns is not a problem for modern databases
+
+---
+
+## 🔗 UPC Alias System & Fuzzy Matching (Nov 9, 2025)
+
+**Problem:** API databases use different UPCs for the same product (regional variants, repackaging, size changes)
+
+**Real-World Example:**
+- Scan UPC `0039400018834` (Bush's Black Beans 15oz)
+- USDA has no exact match for this UPC
+- USDA **does** have UPC `0039400018957` (Bush's Black Beans different size)
+- Nutrition data is nearly identical → Should we discard USDA data? NO!
+
+**Solution: Probabilistic Data Capture with Deferred Validation**
+
+### Core Principle: "Capture Everything, Even Uncertain Matches"
+
+**Instead of:**
+```
+Exact barcode match fails → Discard API data → Move to next API
+```
+
+**We do:**
+```
+Exact barcode match fails → Name-based fuzzy search → Capture top 3 matches with metadata → Flag for user verification → Learn from corrections
+```
+
+### Fuzzy Matching Strategy
+
+**When triggered:**
+1. Exact barcode lookup fails in any API (USDA, OFF, UPC)
+2. User initiates validation in Desktop Pantry app (future)
+
+**What we capture:**
+- Top 3 name-based search results from each API
+- Each result includes: `matched_upc`, `match_score`, `api_nutrition_data`
+- Flag: `requires_verification: true`, `match_type: 'fuzzy_name'`
+
+**Example flow:**
+1. Scan `0039400018834` → USDA exact barcode fails
+2. Get product name from UPCitemdb: "Bush's Black Beans"
+3. Search USDA by name: Returns 3 results with different UPCs
+4. Capture all 3 with scores:
+   - `0039400018957` (score: 95.2)
+   - `0039400019001` (score: 89.4)
+   - `0039400018844` (score: 87.1)
+5. Store nutrition data from all 3, flagged as unverified
+6. User validates in Desktop Pantry app later
+
+### UPC Alias Database
+
+**Purpose:** Many UPCs can point to the same canonical product
+
+**Schema:**
+```sql
+CREATE TABLE upc_aliases (
+  id UUID PRIMARY KEY,
+  scanned_upc TEXT NOT NULL,        -- The UPC user actually scanned
+  canonical_upc TEXT NOT NULL,      -- The "primary" UPC we treat as truth
+  source TEXT NOT NULL,             -- 'usda' | 'off' | 'upc' | 'user_correction'
+  match_confidence DECIMAL,         -- API relevance score (0-100)
+  verified BOOLEAN DEFAULT false,   -- User confirmed this is correct
+  verified_at TIMESTAMP,
+  verified_by TEXT,                 -- User who validated
+  created_at TIMESTAMP DEFAULT now()
+)
+
+-- Index for fast lookup during scanning
+CREATE INDEX idx_upc_aliases_scanned ON upc_aliases(scanned_upc);
+```
+
+**Validation Workflow (Desktop Pantry App - Future):**
+1. User sees item flagged "⚠️ USDA data from similar product"
+2. Desktop app shows side-by-side comparison:
+   - Scanned UPC: `0039400018834`
+   - USDA UPC: `0039400018957`
+   - Nutrition facts comparison
+   - Product photos comparison
+3. User validates: "✓ Same product" or "✗ Different product"
+4. System creates alias: `0039400018834 → 0039400018957 (verified)`
+5. Future scans of either UPC use same canonical product
+
+### Inventory Deduplication
+
+**Priority: Accurate Inventory > API Data Purity**
+
+**Problem without aliases:**
+- Monday: Scan UPC `0039400018834` → Create "Bush's Black Beans" item #1
+- Tuesday: Scan UPC `0039400018957` → Create "Bush's Black Beans" item #2
+- Result: Two pantry entries for same product ❌
+
+**Solution with aliases:**
+- Monday: Scan UPC `0039400018834` → Create inventory item (canonical: `0039400018834`)
+- Desktop app validates: `0039400018957` is same product → Create alias
+- Tuesday: Scan UPC `0039400018957` → Lookup alias → Find canonical → Update **existing** item #1
+- Result: One pantry entry with accurate count ✅
+
+**Scanner Logic (Before Insert):**
+```typescript
+// Check if scanned UPC has a canonical alias
+const alias = await checkUPCAlias(scannedUPC)
+
+if (alias) {
+  // Find existing inventory item with canonical UPC
+  const existingItem = await findInventoryItem(alias.canonical_upc)
+
+  if (existingItem) {
+    // Update existing item (quantity, expiration, etc.)
+    return updateInventoryItem(existingItem.id, newData)
+  }
+}
+
+// No alias or no existing item → Create new inventory item
+return createInventoryItem(scannedUPC, data)
+```
+
+### API Update Strategy
+
+**Always check for updates, even with validated aliases**
+
+- Reason: API databases continuously improve (new products, corrected data)
+- Cost: Minimal (1-2 seconds per scan)
+- Benefit: Catch data corrections, new matches, updated nutrition facts
+
+**Example:**
+- Today: UPC `123` fails USDA lookup → Fuzzy match to UPC `456`
+- User validates: `123 = 456`
+- Tomorrow: USDA adds UPC `123` to their database (exact match now available!)
+- Next scan: Edge function finds exact match → Updates data → Replaces fuzzy match
+
+### Benefits of This Architecture
+
+1. **Never lose potential data** - Even uncertain matches captured for review
+2. **Self-improving system** - Every user validation teaches the system
+3. **Handle real-world complexity** - Products change UPCs constantly
+4. **API resilience** - Databases update independently, we stay current
+5. **Accurate inventory** - Multiple UPCs → One product → No duplicates
+6. **User trust** - Full transparency of data sources and confidence levels
+7. **Future-proof** - Easy to add new APIs, new matching strategies
+
+### Data Storage: Multi-Source with Confidence Tracking
+
+**Every API field stores:**
+- Source-specific value: `usda_calories`, `off_calories`, `upc_calories`
+- Confidence metadata: `usda_calories_confidence` ('exact_barcode' | 'fuzzy_name_unverified' | 'fuzzy_name_verified')
+- Source UPC: `usda_source_upc` (might differ from scanned UPC)
+- Match score: `usda_match_score` (API relevance score)
+
+**Example inventory_items record:**
+```json
+{
+  "barcode": "0039400018834",
+  "usda_calories": 120,
+  "usda_calories_confidence": "fuzzy_name_unverified",
+  "usda_source_upc": "0039400018957",
+  "usda_match_score": 95.2,
+  "off_calories": 120,
+  "off_calories_confidence": "exact_barcode",
+  "off_source_upc": "0039400018834",
+  "nf_calories": 120,  // SSoT: selected from usda/off/upc
+  "requires_verification": true,
+  "potential_upc_matches": [
+    {"upc": "0039400018957", "source": "usda", "score": 95.2},
+    {"upc": "0039400019001", "source": "usda", "score": 89.4}
+  ]
+}
+```
+
+---
 
 ### Data Selection Philosophy (Nov 7, 2025)
 
