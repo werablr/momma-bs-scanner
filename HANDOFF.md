@@ -63,10 +63,13 @@
 **Implementation Status (Nov 12, 2025):**
 - ✅ **Backend Complete** - Edge function + migration deployed
 - ✅ **Documentation Complete** - AI_VISION_DEPLOYMENT.md ready
-- ✅ **Storage Bucket** - user-food-photos created with RLS policies
+- ⚠️ **Storage Bucket** - Needs RLS policies configured (blocking uploads)
 - ✅ **OpenAI API Key** - Set in Supabase secrets
-- ✅ **Mobile UI Complete** - "Scan by Photo" button + full workflow implemented
-- ⏳ **Testing Pending** - Ready for end-to-end testing with real produce
+- ✅ **Mobile UI Complete** - PhotoCaptureScreen implemented with camera controls
+- ✅ **FileSystem Integration** - Fixed to use expo-file-system/legacy API
+- ✅ **Photo Capture Working** - Camera takes photo, reads file as base64
+- 🔧 **Upload Blocked** - RLS policy error: "new row violates row-level security policy"
+- ⏳ **Testing Blocked** - Need to fix storage bucket RLS policies first
 
 ---
 
@@ -1301,6 +1304,6 @@ RETURNS TABLE(
 ---
 
 **End of Handoff Document**
-**Status:** 🔥 IN PROGRESS - AI Vision Planning Complete, Starting Backend Implementation
+**Status:** 🔧 IN PROGRESS - AI Vision UI Complete, Needs Storage RLS Policies
 **Last Updated:** November 12, 2025
-**Last Session:** USDA integration shelved (future Pantry addon). Prioritizing AI vision identification for produce/bulk items. **Hybrid photo strategy decided:** User photos stored in Supabase Storage for building personal visual database. Display priority: user photo > OFF photo > UPC photo. Ready to implement storage bucket, edge function, and mobile UI.
+**Last Session:** AI Vision mobile UI implemented and tested. PhotoCaptureScreen working with corrected FileSystem API (using legacy import). Photo capture successful, but upload blocked by Supabase Storage RLS policies. **NEXT:** Create/configure `user-food-photos` storage bucket with proper RLS policies to allow public uploads, then test end-to-end AI Vision workflow.

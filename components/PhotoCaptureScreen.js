@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 import scannerAPI from '../services/scannerAPI';
 
@@ -76,18 +77,28 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
   const uploadPhotoToStorage = async (localPath) => {
     try {
       // Read file as base64
-      const response = await fetch(`file://${localPath}`);
-      const blob = await response.blob();
+      const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
+      const base64 = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: 'base64',
+      });
 
       // Generate unique filename
       const timestamp = Date.now();
       const filename = `${timestamp}.jpg`;
       const filePath = `user-food-photos/${filename}`;
 
+      // Decode base64 to binary for upload
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('user-food-photos')
-        .upload(filePath, blob, {
+        .upload(filePath, byteArray.buffer, {
           contentType: 'image/jpeg',
           cacheControl: '3600',
         });
@@ -130,42 +141,42 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
         device={device}
         isActive={!loading}
         photo={true}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-            <Text style={styles.cancelButtonText}>✕ Cancel</Text>
+      />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+          <Text style={styles.cancelButtonText}>✕ Cancel</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Instructions */}
+      <View style={styles.instructionsContainer}>
+        <Text style={styles.instructionsText}>
+          Position the item in the center
+        </Text>
+        <Text style={styles.instructionsSubtext}>
+          Works best with good lighting
+        </Text>
+      </View>
+
+      {/* Capture Button */}
+      <View style={styles.bottomContainer}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={styles.loadingText}>{loadingMessage}</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={handleTakePhoto}
+            activeOpacity={0.7}
+          >
+            <View style={styles.captureButtonInner} />
           </TouchableOpacity>
-        </View>
-
-        {/* Instructions */}
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsText}>
-            Position the item in the center
-          </Text>
-          <Text style={styles.instructionsSubtext}>
-            Works best with good lighting
-          </Text>
-        </View>
-
-        {/* Capture Button */}
-        <View style={styles.bottomContainer}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#fff" />
-              <Text style={styles.loadingText}>{loadingMessage}</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={handleTakePhoto}
-              activeOpacity={0.7}
-            >
-              <View style={styles.captureButtonInner} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </Camera>
+        )}
+      </View>
     </View>
   );
 }
