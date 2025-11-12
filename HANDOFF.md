@@ -6,62 +6,104 @@
 
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
-**Purpose:** Data ingestion via barcode scanning (OFF + UPC APIs only)
-**Date:** November 9, 2025
-**Status:** ✅ **WORKING** - Two-API Strategy (OFF + UPC), USDA Moved to Pantry App
+**Purpose:** Data ingestion via barcode scanning + AI vision identification
+**Date:** November 12, 2025
+**Status:** 🔥 **ACTIVE DEVELOPMENT** - Adding AI Vision for Produce/Bulk Items
 
 ---
 
-## 🔄 ARCHITECTURAL CHANGE: USDA → Pantry App (Nov 9, 2025)
+## 🔥 NEW FEATURE: AI Vision for Produce (Nov 12, 2025)
 
-**Decision:** USDA enrichment removed from Scanner, moved to Pantry app
+**Challenge:** Most produce and bulk items don't have barcodes
+
+**Solution:** AI-powered visual identification using OpenAI GPT-4 Vision
+
+**Use Cases:**
+- 🍎 Fresh produce (apples, peppers, onions, etc.)
+- 🥜 Bulk bin items (nuts, grains, candy)
+- 🍪 Homemade/leftover foods
+- 📦 Items where barcode won't scan
+- 🌍 International products without UPC
+
+**Workflow:**
+1. User taps "Scan by Photo" button (new UI alongside barcode scan)
+2. Camera opens, user takes photo of item
+3. Photo uploads to Supabase Storage
+4. **OpenAI GPT-4 Vision** identifies item ("Fuji Apple", "Red Bell Pepper")
+5. User confirms or corrects AI suggestion
+6. Search **Open Food Facts** by confirmed name
+7. Show top 3-5 OFF matches with photos
+8. User selects correct match
+9. Proceed to storage location + expiration entry (normal workflow)
+
+**Technical Implementation:**
+- **AI Service:** OpenAI GPT-4 Vision API
+- **Edge Function:** `identify-by-photo` (new)
+- **Photo Storage:** Supabase Storage bucket: `user-food-photos` (thumbnails + originals)
+- **Barcode Generation:** `PHOTO-{timestamp}` for non-UPC items
+- **Database Field:** `photo_user_uploaded` (stores user's photo URL)
+
+**Hybrid Photo Strategy:**
+- **Barcode items with OFF photos:** Optional user photo (can replace OFF photo)
+- **AI vision items (no barcode):** Required user photo (stored permanently)
+- **Display priority:** `COALESCE(photo_user_uploaded, photo_highres, photo_thumb)`
+- **Storage estimate:** ~30KB thumbnails, ~200KB originals per item
+- **Auto-cleanup:** Photos deleted when items archived to history
+- **Benefit:** Builds personal visual database for faster future recognition
+
+**Benefits:**
+- ✅ No more skipping produce items
+- ✅ Complete inventory coverage (not just packaged goods)
+- ✅ AI learning improves over time
+- ✅ Fallback to manual entry if AI fails
+
+---
+
+## 🔄 ARCHITECTURAL CHANGE: USDA Shelved (Nov 12, 2025)
+
+**Previous Decision (Nov 9):** USDA moved to Pantry app for on-demand enrichment
+
+**New Decision (Nov 12):** USDA integration fully shelved for now
 
 **Rationale:**
-- **Scanner priority:** Speed and reliability during physical scanning workflow
-- **USDA complexity:** Fuzzy matching is slow, requires user validation with desktop UI
-- **User experience:** On-demand enrichment (user chooses when to add USDA data)
-- **Separation of concerns:** Scanner = fast ingestion, Pantry = detailed validation
-
-**What Changed:**
-- ❌ **Removed:** All USDA API calls from `scanner-ingest` edge function
-- ❌ **Removed:** USDA extraction functions (`extractUSDAProduct`, `extractUSDANutrition`)
-- ❌ **Removed:** USDA fuzzy matching logic (Levenshtein distance, validation checks)
-- ✅ **Kept:** All `usda_*` columns in database (set to NULL, Pantry will populate)
-- ✅ **Kept:** `usda_match_validations` table (Pantry will use for validation workflow)
+- **Low priority:** Focus on core scanning workflow first
+- **Low UPC coverage:** USDA branded DB has gaps (~0% match rate observed)
+- **Future feature:** USDA will be optional Pantry addon module
+- **Database ready:** `usda_*` columns remain for future enrichment
 
 **Scanner Now Handles:**
-- ✅ Barcode scanning
+- ✅ Barcode scanning (UPC/EAN)
+- ✅ **AI Vision identification (NEW!)** - for produce/bulk items
 - ✅ Open Food Facts API (nutrition, photos, health scores, dietary flags)
 - ✅ UPCitemdb API (package sizes, product names)
-- ✅ Manual entry (no barcode products)
+- ✅ Manual entry (fallback for any item)
 
-**Pantry Will Handle (Future):**
-- 🔜 USDA data enrichment (on-demand, user-initiated)
-- 🔜 Fuzzy matching with product name similarity
-- 🔜 User validation of USDA matches (side-by-side comparison UI)
-- 🔜 Micronutrient additions (Calcium, Iron, Potassium from USDA)
-
-**See:** [Pantry HANDOFF.md](../momma-bs-pantry/HANDOFF.md) for USDA enrichment implementation plan
+**USDA Status:**
+- 🔮 **Future:** Optional Pantry app addon module
+- 🔮 **Use case:** Advanced users wanting micronutrient data (Calcium, Iron, Potassium)
+- ✅ **Database:** `usda_*` columns preserved for future use
 
 ---
 
-## ✅ SYSTEM OPERATIONAL (Nov 9, 2025)
+## ✅ SYSTEM OPERATIONAL (Nov 12, 2025)
 
-**All Systems Working:**
+**Current Systems Working:**
 - ✅ Two-API strategy operational (OFF + UPC)
 - ✅ Barcode scanning functional
-- ✅ Manual entry fixed - No longer requires barcode (generates `MANUAL-{timestamp}`)
+- ✅ Manual entry functional (generates `MANUAL-{timestamp}`)
 - ✅ Edge function deployed and operational
 - ✅ Data flowing from APIs → Database
+- ✅ 10 items in inventory
+
+**In Development (Nov 12, 2025):**
+- 🔥 **AI Vision identification** - OpenAI GPT-4 Vision for produce/bulk items
+- 🔥 **Photo capture workflow** - New "Scan by Photo" UI button
+- 🔥 **OFF name search** - Search Open Food Facts by AI-identified product name
 
 **Current API Performance:**
 - ✅ **Open Food Facts** - Working perfectly (nutrition, photos, health scores, dietary flags)
 - ✅ **UPCitemdb** - Working perfectly (package sizes)
-
-**Recent Session (Nov 9, 2025):**
-- USDA logic removed from scanner (moved to Pantry app)
-- Edge function redeployed successfully
-- 10 items in inventory, ready for continued testing
+- 🔜 **OpenAI GPT-4 Vision** - To be integrated
 
 ---
 
@@ -820,22 +862,23 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 
 ---
 
-## 🔄 Current API Strategy (Nov 9, 2025)
+## 🔄 Current API Strategy (Nov 12, 2025)
 
-### Scanner: Two-API Approach
+### Scanner: Three-Workflow Approach
 
-**During Scanning (Fast Ingestion):**
+**Workflow 1: Barcode Scanning (Packaged Goods)**
 1. **Product Catalog** - Check cache first (instant)
 2. **Open Food Facts** - Nutrition, health scores, photos, dietary flags (UNLIMITED free)
 3. **UPCitemdb** - Package sizes from titles, pricing data (100/day free)
-4. **Manual Entry** - Fallback if APIs fail
 
-**USDA Fuzzy Matching:**
-- Scanner edge function captures USDA fuzzy matches (top 3) with confidence scores
-- Stored in `usda_fuzzy_matches` JSONB field + `usda_match_validations` table
-- User validates later in Pantry Desktop app (on-demand enrichment)
-- Avoids slowing down physical scanning workflow
-- See [Pantry HANDOFF.md](../momma-bs-pantry/HANDOFF.md) for validation workflow
+**Workflow 2: AI Vision (Produce/Bulk Items) - NEW!**
+1. **OpenAI GPT-4 Vision** - Identify item from photo
+2. **Open Food Facts** - Search by AI-identified name
+3. User selects from top matches
+
+**Workflow 3: Manual Entry (Fallback)**
+- User types product name, brand, details
+- Generates `MANUAL-{timestamp}` barcode
 
 ### Multi-Source Data Storage
 
@@ -845,11 +888,13 @@ SELECT * FROM storage_locations WHERE household_id = '7c093e13-4bcf-463e-96c1-9f
 -- Store each source separately
 off_calories DECIMAL,      -- Open Food Facts
 upc_calories DECIMAL,      -- UPCitemdb
-usda_calories DECIMAL,     -- USDA (after Pantry validation)
+user_calories DECIMAL,     -- User input (manual override)
 
 -- Single source of truth (displayed)
-nf_calories DECIMAL        -- Auto-selected: COALESCE(usda, off, upc)
+nf_calories DECIMAL        -- Auto-selected: COALESCE(user, off, upc)
 ```
+
+**Note:** USDA columns (`usda_*`) remain in schema but set to NULL. Future Pantry addon may populate them.
 
 **Benefits:**
 - Know data provenance (which API provided what)
@@ -867,50 +912,6 @@ nf_calories DECIMAL        -- Auto-selected: COALESCE(usda, off, upc)
 4. **Manual Entry** - User types size
 
 **All sizes flow through catalog** for instant future lookups.
-
-### Visual Identification for Items Without Barcodes (Planned)
-
-**Purpose:** Scan produce, bulk items, and homemade foods using AI vision
-
-**Workflow:**
-1. User taps "Scan by Photo" (new button alongside barcode scan)
-2. Take photo of item (e.g., apple, bulk nuts, homemade cookies)
-3. **AI identifies product** using OpenAI GPT-4 Vision
-   - Example: "Red apple, likely Fuji or Gala variety"
-4. User sees editable suggestion: `[Fuji Apple]` with Edit button
-5. User confirms or corrects identification
-6. System searches USDA by confirmed name
-7. Show top 3 USDA matches with photos (fuzzy matching)
-8. User selects correct match
-9. Proceed to expiration/location entry as normal
-
-**Technical Implementation:**
-- **AI Service:** OpenAI GPT-4 Vision API
-- **Prompt:** "Identify this food item. Provide common name and variety if applicable. Be specific for produce (e.g., 'Fuji Apple' not just 'Apple')."
-- **Photo Storage:** Upload to Supabase Storage, store URL in `photo_user_uploaded`
-- **Barcode Generation:** `PHOTO-{timestamp}` for items without UPCs
-- **USDA Integration:** Use existing fuzzy matching logic with AI-suggested name
-
-**Benefits:**
-- ✅ Scan produce without PLU stickers
-- ✅ Track bulk bin purchases (nuts, grains, candy)
-- ✅ Log homemade/leftover foods
-- ✅ Handle international products without UPC
-- ✅ Backup option when barcode won't scan
-
-**Edge Cases:**
-- AI can't identify → Falls back to manual text entry
-- AI wrong → User corrects before USDA search
-- No USDA match → Manual nutrition entry (future feature)
-- Blurry photo → Prompt user to retake
-
-**UI Location:** Main scan screen with two options:
-```
-┌─────────────────────────────┐
-│   [Scan Barcode]            │  ← Existing
-│   [Scan by Photo] 📷        │  ← New
-└─────────────────────────────┘
-```
 
 ---
 
@@ -1241,90 +1242,54 @@ RETURNS TABLE(
 
 ## 🔜 What's Next (Priority Order)
 
-### Immediate (Completed Nov 9, 2025)
-1. ✅ **COMPLETED** - Fixed network connectivity issues (deprecated columns, RLS, ecoscore validation)
-2. ✅ **COMPLETED** - Verified multi-source strategy working (OFF + UPC)
-3. ✅ **COMPLETED** - Investigated USDA API issue
-   - **Root Cause:** USDA branded database has limited UPC coverage (~0% match rate for tested products)
-   - **Tested:** API is functional, returns data for name searches
-   - **Example:** Bush's Black Beans in USDA with different UPCs (`00039400018803` not `0039400018834`)
-   - **Data Value:** USDA provides Calcium, Iron, Potassium that OFF lacks
-   - **Decision:** Implement fuzzy name-based matching with confidence scoring + user validation
+### Immediate (Nov 12, 2025)
+1. **🔥 IN PROGRESS: AI Vision Integration**
 
-### Short-Term (Next 1-2 Weeks)
-4. **🔥 IN PROGRESS: Implement USDA fuzzy matching in scanner workflow**
+   **Phase 1: Planning & Design** ✅ COMPLETE
+   - ✅ Architecture documented in HANDOFF.md
+   - ✅ Workflow defined (photo → AI identify → OFF search → user select)
+   - ✅ Technical stack selected (OpenAI GPT-4 Vision + Supabase Storage)
 
-   **Phase 1: Database Schema** ✅ COMPLETE (Nov 9, 2025)
-   - ✅ Created `usda_match_validations` table
-     - Tracks user acceptance/rejection of USDA fuzzy matches
-     - Keys on `scanned_upc` + `usda_fdc_id` (not product name)
-     - Stores validation status (TRUE = accepted, FALSE = rejected)
-     - Enables confidence boosting (+20 pts if previously accepted)
-     - Filters out rejected matches from future top 3 results
-   - ✅ Added fields to `inventory_items` table
-     - `usda_fuzzy_matches` JSONB - Array of top 3 matches with metadata
-     - `usda_fuzzy_match_count` INTEGER - Quick count (0-3)
-     - `requires_usda_validation` BOOLEAN - Flag for Desktop Pantry UI
-   - ✅ Deployed migrations to Supabase
+   **Phase 2: Backend Setup** 🔜 NEXT
+   - Create Supabase Storage bucket: `user-food-photos`
+   - Create edge function: `identify-by-photo`
+   - Integrate OpenAI GPT-4 Vision API
+   - Search Open Food Facts by product name
+   - Return top 3-5 matches with photos
 
-   **Phase 2: Edge Function Implementation** 🔜 NEXT (Current Task)
-   - **Implementation Location:** After line 250 in `scanner-ingest/index.ts`
-     - At this point we have `product.food_name` from OFF/UPC APIs
-     - We have `barcode` that was scanned
-     - USDA exact match already failed (line 140)
-   - **Step 1:** Create `performUSDAFuzzySearch()` helper function
-     - Input: `productName` (from OFF/UPC), `barcode`, `supabaseClient`
-     - Call USDA API: `/foods/search?query={productName}&dataType=Branded&pageSize=50`
-     - Returns: Array of all USDA results
-   - **Step 2:** Create `calculateStringSimilarity()` helper function
-     - Input: `str1`, `str2`
-     - Algorithm: Levenshtein distance or Jaro-Winkler
-     - Returns: Confidence score 0-100
-   - **Step 3:** Create `filterAndRankUSDAMatches()` helper function
-     - Input: `allMatches`, `scannedBarcode`, `scannedProductName`, `supabaseClient`
-     - Query `usda_match_validations` table for existing validations
-     - Calculate similarity scores for each USDA result
-     - Filter out previously rejected matches
-     - Boost confidence for previously accepted matches (+20 points)
-     - Sort by confidence score
-     - Return top 3 with metadata
-   - **Step 4:** Update inventory item insert (line 310)
-     - Add `usda_fuzzy_matches` field with top 3 results
-     - Add `usda_fuzzy_match_count` field
-     - Add `requires_usda_validation: true` if matches exist
-     - Store complete nutrition data for each match
+   **Phase 3: Mobile App UI** 🔜
+   - Add "Scan by Photo" button on main screen
+   - Implement photo capture with camera
+   - Show AI-identified name with edit option
+   - Display OFF matches for user selection
+   - Integrate with existing storage location + expiration workflow
 
-   **Phase 3: Desktop Pantry Validation UI** (Future)
-   - Show top 3 matches side-by-side with scanned data
-   - User accepts/rejects each match
-   - Accepted matches marked "Previously validated" on future scans
-   - Rejected matches never shown again for that scanned UPC
+   **Phase 4: Testing** 🔜
+   - Test with various produce (apples, peppers, onions)
+   - Test with bulk items (nuts, grains)
+   - Test edge cases (blurry photos, unknown items)
+   - Verify fallback to manual entry works
 
-   **Goal:** Automation captures USDA data DURING scanning, user validates LATER, system learns and improves
-5. **Continue internal testing** - Scan 20-50 household items
-6. **Document data quality issues** in TESTING.md
-7. **Review multi-source data display** in Pantry app (show provenance)
+2. **Continue internal testing** - Scan 20-50 household items (barcode + photo)
+3. **Document data quality issues** in TESTING.md
+4. **Add package size confirmation UI** in Scanner
+5. **Add health score badges** in review screen
 
 ### Medium-Term (2-4 Weeks)
-8. **Build Desktop Pantry validation UI**
-   - Side-by-side comparison of fuzzy USDA matches
-   - User validation: "Same product" or "Different product"
-   - UPC alias creation on confirmation
-   - Confidence score display
-9. **Add package size confirmation UI** in Scanner
-10. **Polish Scanner UI** based on testing feedback
-11. **Add health score badges** in review screen
-12. **Prepare for App Store submission** when 50+ scans complete
+6. **Polish Scanner UI** based on testing feedback
+7. **Optimize AI prompts** for better produce identification
+8. **Add offline photo queue** (scan photos without internet, process later)
+9. **Prepare for App Store submission** when 50+ scans complete
 
-### USDA API Status (RESOLVED - Nov 9, 2025)
-- **Issue:** Low exact barcode match rate (~0% for current products)
-- **Root Cause:** USDA branded database UPC coverage gaps (different variants/sizes)
-- **Impact:** Missing valuable micronutrient data (Calcium, Iron, Potassium)
-- **Solution:** Fuzzy matching + user validation = capture more data safely
+### USDA API Status (SHELVED - Nov 12, 2025)
+- **Decision:** USDA integration fully shelved for now
+- **Rationale:** Focus on core scanning workflow (barcode + AI vision)
+- **Future:** Optional Pantry app addon module for advanced users
+- **Database:** `usda_*` columns preserved but set to NULL
 
 ---
 
 **End of Handoff Document**
-**Status:** 🔥 IN PROGRESS - Phase 1 Complete (Database), Starting Phase 2 (Edge Function Implementation)
-**Last Updated:** November 9, 2025, 6:00 PM
-**Last Session:** Database schema complete and deployed. Documented detailed implementation plan for Phase 2: fuzzy USDA search, string similarity scoring, validation filtering, and top 3 match storage in edge function.
+**Status:** 🔥 IN PROGRESS - AI Vision Planning Complete, Starting Backend Implementation
+**Last Updated:** November 12, 2025
+**Last Session:** USDA integration shelved (future Pantry addon). Prioritizing AI vision identification for produce/bulk items. **Hybrid photo strategy decided:** User photos stored in Supabase Storage for building personal visual database. Display priority: user photo > OFF photo > UPC photo. Ready to implement storage bucket, edge function, and mobile UI.
