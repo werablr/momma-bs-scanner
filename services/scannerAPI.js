@@ -339,6 +339,31 @@ class ScannerAPI {
     }
   }
 
+  // AI Vision: Identify food by photo
+  async identifyByPhoto(photoUrl, householdId = '7c093e13-4bcf-463e-96c1-9f499de9c4f2') {
+    try {
+      console.log('🤖 Calling AI Vision API with photo:', photoUrl);
+
+      const { data, error } = await supabase.functions.invoke('identify-by-photo', {
+        body: {
+          photo_url: photoUrl,
+          household_id: householdId
+        }
+      });
+
+      if (error) {
+        console.error('❌ AI Vision error:', error);
+        throw error;
+      }
+
+      console.log('✅ AI Vision result:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ AI Vision failed:', error);
+      throw error;
+    }
+  }
+
 }
 
 export default new ScannerAPI();

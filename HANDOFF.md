@@ -37,11 +37,14 @@
 9. Proceed to storage location + expiration entry (normal workflow)
 
 **Technical Implementation:**
-- **AI Service:** OpenAI GPT-4 Vision API
-- **Edge Function:** `identify-by-photo` (new)
-- **Photo Storage:** Supabase Storage bucket: `user-food-photos` (thumbnails + originals)
+- **AI Service:** OpenAI GPT-4 Vision API (~$0.01-0.03 per photo)
+- **Edge Function:** `identify-by-photo` ✅ **CREATED** (ready to deploy)
+- **Photo Storage:** Supabase Storage bucket: `user-food-photos` ✅ **MIGRATION READY**
 - **Barcode Generation:** `PHOTO-{timestamp}` for non-UPC items
-- **Database Field:** `photo_user_uploaded` (stores user's photo URL)
+- **Database Fields:**
+  - `photo_user_uploaded` - User's photo URL ✅ **MIGRATION READY**
+  - `ai_identified_name` - AI Vision result ✅ **MIGRATION READY**
+  - `ai_confidence` - AI confidence score (0.00-1.00) ✅ **MIGRATION READY**
 
 **Hybrid Photo Strategy:**
 - **Barcode items with OFF photos:** Optional user photo (can replace OFF photo)
@@ -56,6 +59,14 @@
 - ✅ Complete inventory coverage (not just packaged goods)
 - ✅ AI learning improves over time
 - ✅ Fallback to manual entry if AI fails
+
+**Implementation Status (Nov 12, 2025):**
+- ✅ **Backend Complete** - Edge function + migration deployed
+- ✅ **Documentation Complete** - AI_VISION_DEPLOYMENT.md ready
+- ✅ **Storage Bucket** - user-food-photos created with RLS policies
+- ✅ **OpenAI API Key** - Set in Supabase secrets
+- ✅ **Mobile UI Complete** - "Scan by Photo" button + full workflow implemented
+- ⏳ **Testing Pending** - Ready for end-to-end testing with real produce
 
 ---
 

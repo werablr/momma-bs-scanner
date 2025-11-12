@@ -10,6 +10,8 @@ import ExpirationDateCapture from './ExpirationDateCapture';
 import ManualEntryForm from './ManualEntryForm';
 import OCRTestingScreen from './OCRTestingScreen';
 import { WorkflowValidator } from './WorkflowValidator';
+import PhotoCaptureScreen from './PhotoCaptureScreen';
+import AIMatchSelector from './AIMatchSelector';
 
 export default function BarcodeScanner({ onProductScanned }) {
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,9 @@ export default function BarcodeScanner({ onProductScanned }) {
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showOCRTesting, setShowOCRTesting] = useState(false);
   const [showWorkflowValidator, setShowWorkflowValidator] = useState(false);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [showAIMatchSelector, setShowAIMatchSelector] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
   const isProcessing = useRef(false);
   const scanCooldown = useRef(false);
 
@@ -373,18 +378,18 @@ export default function BarcodeScanner({ onProductScanned }) {
   const testScannerAPI = async () => {
     try {
       console.log('🧪 Testing scanner API connection...');
-      
+
       const { data: response, error } = await supabase.functions.invoke('scanner-ingest', {
-        body: { 
-          scan_type: 'barcode', 
+        body: {
+          scan_type: 'barcode',
           barcode: '123456789012',
           barcode_type: 'UPC',
           notes: 'API connection test'
         }
       });
-      
+
       console.log('✅ Test API call response:', response);
-      
+
       if (error) {
         Alert.alert('API Test Failed', 'Error: ' + error.message);
       } else {
@@ -394,6 +399,58 @@ export default function BarcodeScanner({ onProductScanned }) {
       console.error('❌ Test API call failed:', error);
       Alert.alert('API Test Failed', 'Error: ' + error.message);
     }
+  };
+
+  // AI Vision handlers
+  const handlePhotoIdentified = (result) => {
+    console.log('📸 Photo identified:', result);
+    setAiResult(result);
+    setShowPhotoCapture(false);
+    setShowAIMatchSelector(true);
+  };
+
+  const handleAIMatchSelected = async (match) => {
+    console.log('✅ Match selected:', match);
+    setShowAIMatchSelector(false);
+
+    // Generate a pseudo-barcode for photo items
+    const photoBarcode = `PHOTO-${Date.now()}`;
+
+    // Set product data similar to barcode scan
+    const productDataFromAI = {
+      name: match.product_name,
+      brand_name: match.brands || '',
+      barcode: photoBarcode,
+      photo_thumb: match.image_thumb_url || aiResult.photoUrl,
+      photo_highres: match.image_url || aiResult.photoUrl,
+      photo_user_uploaded: aiResult.photoUrl,
+      ai_identified_name: aiResult.aiIdentification.name,
+      ai_confidence: aiResult.aiIdentification.confidence,
+      // Nutrition data from OFF match
+      calories: match.nutrition?.energy_kcal || null,
+      protein: match.nutrition?.proteins || null,
+      total_carbohydrate: match.nutrition?.carbohydrates || null,
+      total_fat: match.nutrition?.fat || null,
+      dietary_fiber: match.nutrition?.fiber || null,
+      sugars: match.nutrition?.sugars || null,
+      sodium: match.nutrition?.sodium || null,
+      nutriscore_grade: match.nutriscore_grade || null,
+      nova_group: match.nova_group || null,
+      is_vegan: match.vegan === 1,
+      is_vegetarian: match.vegetarian === 1,
+    };
+
+    setProductData(productDataFromAI);
+    setScannedData({ type: 'photo', data: photoBarcode });
+
+    // Show storage location picker (same workflow as barcode)
+    setShowLocationPicker(true);
+  };
+
+  const handleCancelAIFlow = () => {
+    setShowPhotoCapture(false);
+    setShowAIMatchSelector(false);
+    setAiResult(null);
   };
 
   const updateStorageLocationNames = async () => {
@@ -465,10 +522,22 @@ export default function BarcodeScanner({ onProductScanned }) {
               activeOpacity={0.7}
             >
               <View style={styles.buttonInner}>
-                <Text style={styles.startScanButtonText}>📱 Start New Scan</Text>
+                <Text style={styles.startScanButtonText}>📱 Scan Barcode</Text>
               </View>
             </TouchableOpacity>
-            
+
+            {/* AI Vision Photo Button */}
+            <TouchableOpacity
+              style={[styles.startScanButton, styles.photoScanButton]}
+              onPress={() => setShowPhotoCapture(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.startScanButtonText}>📸 Scan by Photo</Text>
+                <Text style={styles.photoButtonSubtext}>For produce & bulk items</Text>
+              </View>
+            </TouchableOpacity>
+
             {/* Manual Entry Button */}
             <TouchableOpacity
               style={[styles.startScanButton, styles.manualEntryButton]}
@@ -626,6 +695,32 @@ export default function BarcodeScanner({ onProductScanned }) {
           onClose={() => setShowWorkflowValidator(false)}
         />
       </Modal>
+
+      {/* AI Vision Modals */}
+      <Modal
+        visible={showPhotoCapture}
+        animationType="slide"
+        onRequestClose={handleCancelAIFlow}
+      >
+        <PhotoCaptureScreen
+          onPhotoIdentified={handlePhotoIdentified}
+          onCancel={handleCancelAIFlow}
+        />
+      </Modal>
+
+      <Modal
+        visible={showAIMatchSelector}
+        animationType="slide"
+        onRequestClose={handleCancelAIFlow}
+      >
+        {aiResult && (
+          <AIMatchSelector
+            aiResult={aiResult}
+            onMatchSelected={handleAIMatchSelected}
+            onCancel={handleCancelAIFlow}
+          />
+        )}
+      </Modal>
     </View>
   );
 }
@@ -714,6 +809,10 @@ const styles = StyleSheet.create({
     minWidth: 200,
     minHeight: 60,
   },
+  photoScanButton: {
+    backgroundColor: '#34C759',
+    marginTop: 15,
+  },
   manualEntryButton: {
     backgroundColor: '#007AFF',
     marginTop: 15,
@@ -723,6 +822,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  photoButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    marginTop: 5,
+    textAlign: 'center',
   },
   startScanButtonText: {
     color: 'white',
