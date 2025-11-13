@@ -164,16 +164,15 @@ class ScannerAPI {
       console.log('🏠 Fetching household for user:', userId);
 
       const { data, error } = await supabase
-        .from('users')
+        .from('user_households')
         .select(`
           household_id,
           households (
             id,
-            name,
-            settings
+            name
           )
         `)
-        .eq('id', userId)
+        .eq('user_id', userId)
         .single();
 
       if (error) {

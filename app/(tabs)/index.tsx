@@ -19,10 +19,10 @@ export default function HomeScreen() {
     );
   }
 
-  // DEVELOPMENT MODE: Comment out auth check to bypass sign-in
-  // if (!user) {
-  //   return <AuthScreen />;
-  // }
+  // Require authentication
+  if (!user) {
+    return <AuthScreen />;
+  }
 
   const handleProductScanned = async (product: any) => {
     if (product.requiresManualEntry) {
