@@ -352,13 +352,34 @@ class ScannerAPI {
 
       if (error) {
         console.error('❌ AI Vision error:', error);
+        console.error('❌ Error context:', error.context);
+
+        // Try to get the actual error response body
+        if (error.context) {
+          try {
+            const responseBody = await error.context.text();
+            console.error('❌ Response body:', responseBody);
+          } catch (e) {
+            console.error('❌ Could not read response body:', e);
+          }
+        }
+
         throw error;
       }
 
       console.log('✅ AI Vision result:', data);
+
+      // Check if function returned success: false
+      if (data && !data.success) {
+        console.error('❌ AI Vision returned error:', data);
+        throw new Error(data.error || 'AI Vision failed');
+      }
+
       return data;
     } catch (error) {
       console.error('❌ AI Vision failed:', error);
+      console.error('❌ Error name:', error.name);
+      console.error('❌ Error message:', error.message);
       throw error;
     }
   }

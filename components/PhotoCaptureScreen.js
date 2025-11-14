@@ -85,7 +85,7 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
       // Generate unique filename
       const timestamp = Date.now();
       const filename = `${timestamp}.jpg`;
-      const filePath = `user-food-photos/${filename}`;
+      const filePath = `${filename}`;
 
       // Decode base64 to binary for upload
       const byteCharacters = atob(base64);

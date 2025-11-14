@@ -35,7 +35,7 @@ async function identifyFoodWithAI(imageUrl: string, openaiApiKey: string): Promi
       'Authorization': `Bearer ${openaiApiKey}`
     },
     body: JSON.stringify({
-      model: 'gpt-4-vision-preview',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
@@ -79,8 +79,16 @@ Be specific but practical. For produce, include variety if visible (Fuji apple v
     throw new Error('No response from OpenAI')
   }
 
+  // Strip markdown code fences if present (OpenAI sometimes wraps JSON in ```json ... ```)
+  let cleanContent = content.trim()
+  if (cleanContent.startsWith('```json')) {
+    cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+  } else if (cleanContent.startsWith('```')) {
+    cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```$/, '')
+  }
+
   // Parse JSON response
-  const identified = JSON.parse(content)
+  const identified = JSON.parse(cleanContent)
 
   return {
     name: identified.name || 'Unknown',
@@ -240,11 +248,30 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in identify-by-photo:', error)
+    console.error('Error stack:', error.stack)
+    console.error('Error details:', JSON.stringify(error, null, 2))
+
+    // Try to log to database (but don't fail if it errors)
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      )
+      await dbLog(supabaseClient, 'error', 'Edge function error', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name
+      })
+    } catch (logError) {
+      console.error('Failed to log error to database:', logError)
+    }
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Unknown error occurred'
+        error: error.message || 'Unknown error occurred',
+        error_name: error.name,
+        error_details: error.toString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

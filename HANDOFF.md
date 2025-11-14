@@ -7,8 +7,8 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision identification
-**Date:** November 13, 2025
-**Status:** ✅ **SECURED** - Authentication & RLS implemented, AI Vision ready for testing
+**Date:** November 14, 2025
+**Status:** ✅ **OPERATIONAL** - Authentication, RLS, and AI Vision fully working
 
 ---
 
@@ -60,7 +60,7 @@
 - ✅ AI learning improves over time
 - ✅ Fallback to manual entry if AI fails
 
-**Implementation Status (Nov 13, 2025):**
+**Implementation Status (Nov 14, 2025):**
 - ✅ **Backend Complete** - Edge function + migration deployed
 - ✅ **Documentation Complete** - AI_VISION_DEPLOYMENT.md ready
 - ✅ **Storage Bucket RLS** - Configured for authenticated users
@@ -69,7 +69,9 @@
 - ✅ **FileSystem Integration** - Fixed to use expo-file-system/legacy API
 - ✅ **Photo Capture Working** - Camera takes photo, reads file as base64
 - ✅ **Photo Upload Working** - Photos uploading to storage bucket successfully
-- ⚠️ **Edge Function Issue** - AI Vision edge function returning non-2xx status (needs debugging)
+- ✅ **AI Vision Working** - GPT-4o successfully identifying produce (e.g., "Bartlett Pear" with 0.95 confidence)
+- ✅ **Open Food Facts Integration** - Successfully finding 5+ matches for AI-identified items
+- ✅ **Bug Fixed** - OpenAI returns JSON wrapped in markdown code fences, now strips before parsing
 
 ---
 
@@ -1299,15 +1301,8 @@ RETURNS TABLE(
 
 ## 🔜 What's Next (Priority Order)
 
-### Immediate (Nov 13, 2025)
-1. **⚠️ FIX: AI Vision Edge Function**
-   - Debug edge function returning non-2xx status
-   - Check Supabase function logs for errors
-   - Verify OpenAI API key is set correctly
-   - Test edge function independently via Supabase dashboard
-   - Status: Photo upload works, edge function call fails
-
-2. **🔥 COMPLETE: AI Vision Integration**
+### Immediate (Nov 14, 2025)
+1. **✅ COMPLETE: AI Vision Integration**
 
    **Phase 1: Planning & Design** ✅ COMPLETE
    - ✅ Architecture documented in HANDOFF.md
@@ -1317,20 +1312,29 @@ RETURNS TABLE(
    **Phase 2: Backend Setup** ✅ COMPLETE
    - ✅ Created Supabase Storage bucket: `user-food-photos`
    - ✅ Created edge function: `identify-by-photo`
-   - ✅ OpenAI GPT-4 Vision API integrated
+   - ✅ OpenAI GPT-4 Vision API integrated (using gpt-4o model)
    - ✅ RLS policies configured for storage bucket
-   - ⚠️ Edge function debugging needed
+   - ✅ Fixed JSON parsing bug (strips markdown code fences from OpenAI response)
 
    **Phase 3: Mobile App UI** ✅ COMPLETE
    - ✅ Added "Scan by Photo" button on main screen
    - ✅ Implemented photo capture with camera
    - ✅ Photo upload to storage bucket working
-   - 🔜 Show AI-identified name with edit option (pending edge function fix)
-   - 🔜 Display OFF matches for user selection (pending edge function fix)
+   - ✅ Fixed duplicate path issue in storage URLs
+   - 🔜 Show AI-identified name with edit option (UI pending)
+   - 🔜 Display OFF matches for user selection (UI pending)
 
-   **Phase 4: Testing** 🔜 BLOCKED
-   - Blocked by edge function issue
-   - Ready to test once edge function is working
+   **Phase 4: Testing** ✅ WORKING
+   - ✅ Tested with produce (Bartlett Pear)
+   - ✅ AI confidence: 0.95
+   - ✅ Found 5 matches in Open Food Facts
+   - 🔜 Full end-to-end UI workflow implementation
+
+2. **🔥 NEXT: Complete AI Vision UI Flow**
+   - Build product selection screen to show OFF matches
+   - Allow user to confirm/edit AI identification
+   - Proceed to storage location + expiration workflow
+   - Generate `PHOTO-{timestamp}` barcode for non-UPC items
 
 3. **Continue internal testing** - Scan 20-50 household items (barcode + photo)
 4. **Document data quality issues** in TESTING.md
@@ -1352,11 +1356,12 @@ RETURNS TABLE(
 ---
 
 **End of Handoff Document**
-**Status:** ✅ **SECURED** - Authentication & RLS Complete, AI Vision Edge Function Needs Debugging
-**Last Updated:** November 13, 2025
+**Status:** ✅ **OPERATIONAL** - Authentication, RLS, Barcode Scanning, and AI Vision All Working
+**Last Updated:** November 14, 2025
 **Last Session:**
-- ✅ **Security Implementation Complete:** Authentication enabled, RLS policies created for all tables and storage bucket, user linked to household
-- ✅ **Photo Upload Working:** Storage bucket RLS configured, photos uploading successfully to `user-food-photos` bucket
-- ✅ **Storage Locations Loading:** Fixed RLS policy to allow authenticated users to read storage locations
-- ⚠️ **AI Vision Edge Function Issue:** Edge function returning non-2xx status, needs debugging
-- **NEXT:** Debug AI Vision edge function (check logs, verify OpenAI API key, test function independently)
+- ✅ **AI Vision Bug Fixed:** OpenAI GPT-4o returns JSON wrapped in markdown code fences (```json...```), added parsing to strip formatting
+- ✅ **AI Vision Tested:** Successfully identified "Bartlett Pear" with 0.95 confidence
+- ✅ **Open Food Facts Integration:** Successfully found 5 matches for AI-identified produce
+- ✅ **Photo Storage Fixed:** Removed duplicate path in upload (was `user-food-photos/user-food-photos/`, now `user-food-photos/`)
+- ✅ **Model Updated:** Changed from deprecated `gpt-4-vision-preview` to `gpt-4o`
+- **NEXT:** Build UI to display AI-identified name + OFF matches for user selection
