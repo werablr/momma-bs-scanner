@@ -98,6 +98,105 @@ Be specific but practical. For produce, include variety if visible (Fuji apple v
   }
 }
 
+// Search USDA FoodData Central by product name (fresh produce focus)
+async function searchUSDAFoods(productName: string, usdaApiKey: string): Promise<any[]> {
+  // Convert product name to search term optimized for USDA
+  // E.g., "Bartlett Pear" -> "pear raw", "Fuji Apple" -> "apple raw"
+  const searchTerm = prepareUSDASearchTerm(productName)
+
+  const searchUrl = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(searchTerm)}&dataType=Foundation,SR Legacy&pageSize=10&api_key=${usdaApiKey}`
+
+  console.log('Searching USDA FoodData for:', searchTerm)
+
+  const response = await fetch(searchUrl)
+
+  if (!response.ok) {
+    console.error(`USDA API error: ${response.status}`)
+    return []  // Return empty array instead of throwing (USDA is optional)
+  }
+
+  const data = await response.json()
+
+  if (!data.foods || data.foods.length === 0) {
+    return []
+  }
+
+  // Filter for fresh/raw foods and map to consistent format
+  return data.foods
+    .filter((food: any) => {
+      const desc = (food.description || '').toLowerCase()
+      // Prefer raw/fresh items, exclude canned/frozen/dried
+      return desc.includes('raw') ||
+             (!desc.includes('canned') &&
+              !desc.includes('frozen') &&
+              !desc.includes('dried') &&
+              !desc.includes('cooked'))
+    })
+    .slice(0, 5)  // Top 5 fresh matches
+    .map((food: any) => ({
+      source: 'usda',
+      fdc_id: food.fdcId,
+      product_name: food.description || 'Unknown',
+      brands: '',  // USDA doesn't have brands (generic foods)
+      image_url: null,  // USDA doesn't provide images
+      image_thumb_url: null,
+      // Extract nutrition from foodNutrients array
+      nutrition: extractUSDANutrition(food.foodNutrients || []),
+      // USDA-specific fields
+      data_type: food.dataType,
+      scientific_name: food.scientificName || null,
+      match_score: calculateMatchScore(searchTerm, food.description, '')
+    }))
+    .sort((a: any, b: any) => b.match_score - a.match_score)
+}
+
+// Prepare search term for USDA (focus on generic raw foods)
+function prepareUSDASearchTerm(productName: string): string {
+  let term = productName.toLowerCase()
+
+  // Remove variety names (Fuji, Bartlett, etc.) - USDA uses generic terms
+  const varieties = ['fuji', 'gala', 'granny smith', 'honeycrisp', 'bartlett', 'bosc', 'anjou']
+  varieties.forEach(variety => {
+    term = term.replace(variety, '').trim()
+  })
+
+  // Add "raw" for produce items to prioritize fresh
+  const produceItems = ['apple', 'pear', 'banana', 'orange', 'pepper', 'onion', 'tomato', 'carrot', 'broccoli']
+  if (produceItems.some(item => term.includes(item))) {
+    term = term + ' raw'
+  }
+
+  return term.trim()
+}
+
+// Extract nutrition data from USDA foodNutrients array
+function extractUSDANutrition(nutrients: any[]): any {
+  const nutrition: any = {}
+
+  // Map USDA nutrient IDs to our field names
+  const nutrientMap: { [key: number]: string } = {
+    1008: 'energy_kcal',      // Energy (kcal)
+    1003: 'proteins',         // Protein
+    1004: 'fat',              // Total lipid (fat)
+    1005: 'carbohydrates',    // Carbohydrate
+    1079: 'fiber',            // Fiber, total dietary
+    2000: 'sugars',           // Sugars, total
+    1093: 'sodium',           // Sodium
+    1087: 'calcium',          // Calcium
+    1089: 'iron',             // Iron
+    1092: 'potassium',        // Potassium
+  }
+
+  nutrients.forEach((nutrient: any) => {
+    const fieldName = nutrientMap[nutrient.nutrientId]
+    if (fieldName && nutrient.value != null) {
+      nutrition[fieldName] = nutrient.value
+    }
+  })
+
+  return nutrition
+}
+
 // Search Open Food Facts by product name
 async function searchOpenFoodFacts(productName: string): Promise<any[]> {
   const searchUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(productName)}&search_simple=1&action=process&json=1&page_size=5`
@@ -122,6 +221,7 @@ async function searchOpenFoodFacts(productName: string): Promise<any[]> {
 
   // Map to consistent format
   return data.products.map((product: any) => ({
+    source: 'off',
     product_name: product.product_name || 'Unknown',
     brands: product.brands || '',
     image_url: product.image_url || product.image_front_url || null,
@@ -219,12 +319,37 @@ serve(async (req) => {
 
     console.log('AI identified:', aiResult.name, 'with confidence:', aiResult.confidence)
 
-    // Step 2: Search Open Food Facts for matches
-    await dbLog(supabaseClient, 'debug', 'Searching Open Food Facts', { search_term: aiResult.name })
-    const offMatches = await searchOpenFoodFacts(aiResult.name)
-    await dbLog(supabaseClient, 'info', 'Open Food Facts search complete', { matches_found: offMatches.length })
+    // Step 2: Search both USDA and Open Food Facts in parallel
+    const usdaApiKey = Deno.env.get('USDA_API_KEY')
 
-    console.log('Found', offMatches.length, 'matches in Open Food Facts')
+    await dbLog(supabaseClient, 'debug', 'Searching USDA and OFF in parallel', { search_term: aiResult.name })
+
+    const [usdaMatches, offMatches] = await Promise.all([
+      usdaApiKey
+        ? searchUSDAFoods(aiResult.name, usdaApiKey).catch(err => {
+            console.error('USDA search failed:', err)
+            return []
+          })
+        : Promise.resolve([]),
+      searchOpenFoodFacts(aiResult.name).catch(err => {
+        console.error('OFF search failed:', err)
+        return []
+      })
+    ])
+
+    await dbLog(supabaseClient, 'info', 'Search results', {
+      usda_matches: usdaMatches.length,
+      off_matches: offMatches.length
+    })
+
+    console.log('Found', usdaMatches.length, 'USDA matches and', offMatches.length, 'OFF matches')
+
+    // Combine and sort matches by source and score
+    // USDA first (fresh produce), then OFF (packaged items)
+    const allMatches = [
+      ...usdaMatches.map((m: any) => ({ ...m, source: 'usda' })),
+      ...offMatches.map((m: any) => ({ ...m, source: 'off' }))
+    ]
 
     // Return results
     return new Response(
@@ -236,8 +361,10 @@ serve(async (req) => {
           category: aiResult.category,
           reasoning: aiResult.reasoning
         },
-        off_matches: offMatches.slice(0, 5),  // Top 5 matches
-        total_matches: offMatches.length,
+        matches: allMatches,
+        usda_matches: usdaMatches.length,
+        off_matches: offMatches.length,
+        total_matches: allMatches.length,
         photo_url: photo_url
       }),
       {

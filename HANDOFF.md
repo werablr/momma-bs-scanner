@@ -12,11 +12,11 @@
 
 ---
 
-## 🔥 NEW FEATURE: AI Vision for Produce (Nov 12, 2025)
+## 🔥 NEW FEATURE: AI Vision + USDA for Fresh Produce (Nov 16, 2025)
 
 **Challenge:** Most produce and bulk items don't have barcodes
 
-**Solution:** AI-powered visual identification using OpenAI GPT-4 Vision
+**Solution:** AI-powered visual identification using OpenAI GPT-4 Vision + USDA FoodData Central for fresh produce nutrition
 
 **Use Cases:**
 - 🍎 Fresh produce (apples, peppers, onions, etc.)
@@ -75,16 +75,32 @@
 
 ---
 
-## 🔄 ARCHITECTURAL CHANGE: USDA Shelved (Nov 12, 2025)
+## 🎯 USDA INTEGRATED FOR FRESH PRODUCE (Nov 16, 2025)
 
-**Previous Decision (Nov 9):** USDA moved to Pantry app for on-demand enrichment
+**Challenge:** OFF searches for fresh produce (e.g., "Bartlett Pear") returned mostly canned/packaged items
 
-**New Decision (Nov 12):** USDA integration fully shelved for now
+**Solution:** Integrate USDA FoodData Central API alongside Open Food Facts for AI Vision items
 
-**Rationale:**
-- **Low priority:** Focus on core scanning workflow first
-- **Low UPC coverage:** USDA branded DB has gaps (~0% match rate observed)
-- **Future feature:** USDA will be optional Pantry addon module
+**Why USDA Works for Produce:**
+- ✅ **Purpose-built for fresh/raw foods** - Not focused on branded products
+- ✅ **Comprehensive nutrition** - 150+ nutrients including micronutrients (calcium, iron, potassium)
+- ✅ **Both fruits AND vegetables** - Complete fresh produce coverage
+- ✅ **Free with API key** - No subscription costs
+- ✅ **Generic food names** - "Pear, raw" vs brand-specific products
+
+**Implementation:**
+- **Edge Function:** `identify-by-photo` searches USDA + OFF in parallel
+- **USDA API Key:** Set in Supabase secrets (`USDA_API_KEY`)
+- **Search Strategy:** Auto-converts "Bartlett Pear" → "pear raw" for USDA queries
+- **Filtering:** Prioritizes raw/fresh items, excludes canned/frozen/dried
+- **Result Display:** USDA results tagged with 🌱 Fresh badge, OFF with 📦 Packaged badge
+
+**Example Results for "Bartlett Pear" Photo:**
+- USDA: "Pears, raw" (generic, comprehensive nutrition)
+- USDA: "Pears, asian, raw" (variety-specific)
+- USDA: "Pears, raw, bartlett" (exact variety match)
+- OFF: "Bartlett pear halves" (canned product)
+- OFF: "Bartlett pear halves in juice" (Del Monte branded)
 - **Database ready:** `usda_*` columns remain for future enrichment
 
 **Scanner Now Handles:**

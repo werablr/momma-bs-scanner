@@ -48,10 +48,12 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
       console.log('AI identification result:', result);
 
       if (result.success) {
-        // Pass results to parent
+        // Pass results to parent (now includes both USDA and OFF matches)
         onPhotoIdentified({
           aiIdentification: result.ai_identification,
-          matches: result.off_matches,
+          matches: result.matches || [],
+          usdaCount: result.usda_matches || 0,
+          offCount: result.off_matches || 0,
           photoUrl: photoUrl
         });
       } else {

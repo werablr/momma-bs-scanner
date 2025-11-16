@@ -139,6 +139,23 @@ export default function BarcodeScanner({ onProductScanned }) {
     setLoading(true);
 
     try {
+      // Check if this is an AI Vision scan (photo-based)
+      if (scannedData.type === 'photo') {
+        // AI Vision items already have all product data - skip API call
+        console.log('📸 AI Vision item - skipping barcode API call');
+
+        // Generate a temporary scan ID for workflow tracking
+        setCurrentScanId(`PHOTO-${Date.now()}`);
+        setWorkflowStep(2);
+
+        // Product data already set in handleAIMatchSelected
+        // Just proceed to expiration date capture
+        setShowExpirationCapture(true);
+        setLoading(false);
+        return;
+      }
+
+      // Regular barcode workflow - call API
       // Step 1: Submit barcode with storage location
       const step1Result = await scannerAPI.step1Barcode(scannedData.barcode, location.id);
 
@@ -247,7 +264,7 @@ export default function BarcodeScanner({ onProductScanned }) {
 
     try {
       const corrections = correctedData.manual_corrections;
-      
+
       // Include expiration date data if available
       const dataToSubmit = {
         ...correctedData,
@@ -256,12 +273,64 @@ export default function BarcodeScanner({ onProductScanned }) {
         ocr_text: expirationData?.ocrText
       };
 
+      // Check if this is an AI Vision item
+      if (scannedData.type === 'photo') {
+        console.log('💾 Saving AI Vision item directly to database...');
+
+        // Insert directly into inventory_items table
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert({
+            household_id: householdId,
+            barcode: scannedData.barcode, // PHOTO-{timestamp}
+            storage_location_id: selectedStorage,
+            expiration_date: dataToSubmit.expiration_date,
+            food_name: dataToSubmit.name,
+            brand_name: dataToSubmit.brand_name || '',
+            // Photos
+            photo_thumb: dataToSubmit.photo_thumb,
+            photo_highres: dataToSubmit.photo_highres,
+            photo_user_uploaded: dataToSubmit.photo_user_uploaded,
+            // AI Vision metadata
+            ai_identified_name: dataToSubmit.ai_identified_name,
+            ai_confidence: dataToSubmit.ai_confidence,
+            // Nutrition data (works for both USDA and OFF)
+            nf_calories: dataToSubmit.calories,
+            nf_protein: dataToSubmit.protein,
+            nf_total_carbohydrate: dataToSubmit.total_carbohydrate,
+            nf_total_fat: dataToSubmit.total_fat,
+            nf_dietary_fiber: dataToSubmit.dietary_fiber,
+            nf_sugars: dataToSubmit.sugars,
+            nf_sodium: dataToSubmit.sodium,
+            // USDA-specific micronutrients
+            usda_calcium: dataToSubmit.calcium,
+            usda_iron: dataToSubmit.iron,
+            usda_potassium: dataToSubmit.potassium,
+            // USDA-specific fields
+            usda_fdc_id: dataToSubmit.fdc_id,
+            // OFF-specific fields
+            nutriscore_grade: dataToSubmit.nutriscore_grade,
+            nova_group: dataToSubmit.nova_group,
+            is_vegan: dataToSubmit.is_vegan,
+            is_vegetarian: dataToSubmit.is_vegetarian,
+            // Status
+            status: 'active',
+            volume_remaining: 100
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('✅ AI Vision item saved:', data.id);
+      }
+
       // Two-step workflow - data already saved, just approve
       const result = { success: true, corrections_submitted: !!corrections };
 
       const selectedLocation = storageLocations.find(loc => loc.id === selectedStorage);
       const hasCorrections = result.corrections_submitted;
-      
+
       Alert.alert(
         'Success! ✅',
         `${correctedData.name} added to ${selectedLocation?.name}${hasCorrections ? ' (with corrections)' : ''}`,
@@ -270,9 +339,9 @@ export default function BarcodeScanner({ onProductScanned }) {
           { text: 'Done', onPress: () => resetScanner() }
         ]
       );
-      
+
       onProductScanned?.(correctedData);
-      
+
     } catch (error) {
       console.error('❌ Error adding to inventory:', error);
       Alert.alert('Error', error.message || 'Failed to add to inventory', [
@@ -426,7 +495,8 @@ export default function BarcodeScanner({ onProductScanned }) {
       photo_user_uploaded: aiResult.photoUrl,
       ai_identified_name: aiResult.aiIdentification.name,
       ai_confidence: aiResult.aiIdentification.confidence,
-      // Nutrition data from OFF match
+      data_source: match.source || 'off', // Track whether USDA or OFF
+      // Nutrition data (works for both USDA and OFF)
       calories: match.nutrition?.energy_kcal || null,
       protein: match.nutrition?.proteins || null,
       total_carbohydrate: match.nutrition?.carbohydrates || null,
@@ -434,6 +504,14 @@ export default function BarcodeScanner({ onProductScanned }) {
       dietary_fiber: match.nutrition?.fiber || null,
       sugars: match.nutrition?.sugars || null,
       sodium: match.nutrition?.sodium || null,
+      // USDA-specific micronutrients
+      calcium: match.nutrition?.calcium || null,
+      iron: match.nutrition?.iron || null,
+      potassium: match.nutrition?.potassium || null,
+      // USDA-specific fields
+      fdc_id: match.fdc_id || null,
+      scientific_name: match.scientific_name || null,
+      // OFF-specific fields
       nutriscore_grade: match.nutriscore_grade || null,
       nova_group: match.nova_group || null,
       is_vegan: match.vegan === 1,

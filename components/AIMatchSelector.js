@@ -99,8 +99,15 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel })
 
         {/* Matches */}
         <Text style={styles.sectionTitle}>
-          {matches.length > 0 ? `${matches.length} matches from Open Food Facts:` : 'No matches found'}
+          {matches.length > 0
+            ? `${matches.length} match${matches.length === 1 ? '' : 'es'} found:`
+            : 'No matches found'}
         </Text>
+        {aiResult.usdaCount > 0 && aiResult.offCount > 0 && (
+          <Text style={styles.sourceInfo}>
+            {aiResult.usdaCount} fresh (USDA) • {aiResult.offCount} packaged (OFF)
+          </Text>
+        )}
 
         {matches.length > 0 ? (
           matches.map((match, index) => (
@@ -119,7 +126,19 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel })
                   />
                 )}
                 <View style={styles.matchInfo}>
-                  <Text style={styles.matchName}>{match.product_name}</Text>
+                  <View style={styles.matchHeader}>
+                    <Text style={styles.matchName}>{match.product_name}</Text>
+                    {match.source && (
+                      <View style={[
+                        styles.sourceBadge,
+                        match.source === 'usda' ? styles.usdaBadge : styles.offBadge
+                      ]}>
+                        <Text style={styles.sourceBadgeText}>
+                          {match.source === 'usda' ? '🌱 Fresh' : '📦 Packaged'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   {match.brands && (
                     <Text style={styles.matchBrand}>{match.brands}</Text>
                   )}
@@ -280,6 +299,12 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 10,
   },
+  sourceInfo: {
+    fontSize: 14,
+    color: '#666',
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
   matchCard: {
     backgroundColor: '#fff',
     marginHorizontal: 20,
@@ -305,11 +330,34 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 15,
   },
+  matchHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
   matchName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 5,
+    flex: 1,
+    marginRight: 10,
+  },
+  sourceBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  usdaBadge: {
+    backgroundColor: '#e8f5e9',
+  },
+  offBadge: {
+    backgroundColor: '#fff3e0',
+  },
+  sourceBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#333',
   },
   matchBrand: {
     fontSize: 14,
