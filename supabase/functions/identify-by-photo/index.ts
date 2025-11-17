@@ -28,6 +28,19 @@ async function identifyFoodWithAI(imageUrl: string, openaiApiKey: string): Promi
   category: string,
   reasoning: string
 }> {
+  // Fetch the image and convert to base64
+  console.log('Fetching image from:', imageUrl)
+  const imageResponse = await fetch(imageUrl)
+  if (!imageResponse.ok) {
+    throw new Error(`Failed to fetch image: ${imageResponse.status}`)
+  }
+
+  const imageBuffer = await imageResponse.arrayBuffer()
+  const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)))
+  const base64DataUrl = `data:image/jpeg;base64,${base64Image}`
+
+  console.log('Converted image to base64, size:', base64Image.length)
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -58,7 +71,7 @@ Be specific but practical. For produce, include variety if visible (Fuji apple v
             {
               type: 'image_url',
               image_url: {
-                url: imageUrl
+                url: base64DataUrl
               }
             }
           ]
@@ -69,7 +82,9 @@ Be specific but practical. For produce, include variety if visible (Fuji apple v
   })
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`)
+    const errorBody = await response.text()
+    console.error('OpenAI API error response:', errorBody)
+    throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorBody}`)
   }
 
   const result = await response.json()

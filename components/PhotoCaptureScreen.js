@@ -84,10 +84,11 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
         encoding: 'base64',
       });
 
-      // Generate unique filename
+      // Generate unique filename with household folder structure
+      const HOUSEHOLD_ID = '7c093e13-4bcf-463e-96c1-9f499de9c4f2';
       const timestamp = Date.now();
       const filename = `${timestamp}.jpg`;
-      const filePath = `${filename}`;
+      const filePath = `${HOUSEHOLD_ID}/${filename}`;
 
       // Decode base64 to binary for upload
       const byteCharacters = atob(base64);

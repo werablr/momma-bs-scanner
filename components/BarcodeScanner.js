@@ -36,6 +36,9 @@ export default function BarcodeScanner({ onProductScanned }) {
   const isProcessing = useRef(false);
   const scanCooldown = useRef(false);
 
+  // Household ID - hardcoded for now, will be from auth later
+  const HOUSEHOLD_ID = '7c093e13-4bcf-463e-96c1-9f499de9c4f2';
+
   // Vision Camera hooks
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -141,15 +144,60 @@ export default function BarcodeScanner({ onProductScanned }) {
     try {
       // Check if this is an AI Vision scan (photo-based)
       if (scannedData.type === 'photo') {
-        // AI Vision items already have all product data - skip API call
-        console.log('📸 AI Vision item - skipping barcode API call');
+        console.log('📸 AI Vision item - creating DB record in step 1');
 
-        // Generate a temporary scan ID for workflow tracking
-        setCurrentScanId(`PHOTO-${Date.now()}`);
+        // Step 1: Create inventory record with AI Vision data
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert({
+            household_id: HOUSEHOLD_ID,
+            barcode: scannedData.barcode, // PHOTO-{timestamp}
+            storage_location_id: location.id,
+            food_name: productData.name,
+            brand_name: productData.brand_name || '',
+            // Photos
+            photo_thumb: productData.photo_thumb,
+            photo_highres: productData.photo_highres,
+            photo_user_uploaded: productData.photo_user_uploaded,
+            // AI Vision metadata
+            ai_identified_name: productData.ai_identified_name,
+            ai_confidence: productData.ai_confidence,
+            // Nutrition data (works for both USDA and OFF)
+            nf_calories: productData.calories,
+            nf_protein: productData.protein,
+            nf_total_carbohydrate: productData.total_carbohydrate,
+            nf_total_fat: productData.total_fat,
+            nf_dietary_fiber: productData.dietary_fiber,
+            nf_sugars: productData.sugars,
+            nf_sodium: productData.sodium,
+            // USDA-specific micronutrients
+            usda_calcium: productData.calcium,
+            usda_iron: productData.iron,
+            usda_potassium: productData.potassium,
+            // USDA-specific fields
+            usda_fdc_id: productData.fdc_id,
+            // OFF-specific fields
+            nutriscore_grade: productData.nutriscore_grade,
+            nova_group: productData.nova_group,
+            is_vegan: productData.is_vegan,
+            is_vegetarian: productData.is_vegetarian,
+            // Status
+            status: 'pending',
+            volume_remaining: 100
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Failed to create AI Vision inventory item:', error);
+          throw error;
+        }
+
+        console.log('✅ Step 1 complete, item ID:', data.id);
+        setCurrentScanId(data.id);
         setWorkflowStep(2);
 
-        // Product data already set in handleAIMatchSelected
-        // Just proceed to expiration date capture
+        // Show expiration date capture for step 2
         setShowExpirationCapture(true);
         setLoading(false);
         return;
@@ -263,77 +311,24 @@ export default function BarcodeScanner({ onProductScanned }) {
     setLoading(true);
 
     try {
-      const corrections = correctedData.manual_corrections;
+      console.log('✅ Review approved - data already in database from step 1 & 2');
 
-      // Include expiration date data if available
-      const dataToSubmit = {
-        ...correctedData,
-        expiration_date: expirationData?.date || correctedData.expiration_date,
-        ocr_confidence: expirationData?.confidence,
-        ocr_text: expirationData?.ocrText
-      };
+      // Update status to 'active' to mark as complete
+      const { error: updateError } = await supabase
+        .from('inventory_items')
+        .update({ status: 'active' })
+        .eq('id', currentScanId);
 
-      // Check if this is an AI Vision item
-      if (scannedData.type === 'photo') {
-        console.log('💾 Saving AI Vision item directly to database...');
-
-        // Insert directly into inventory_items table
-        const { data, error } = await supabase
-          .from('inventory_items')
-          .insert({
-            household_id: householdId,
-            barcode: scannedData.barcode, // PHOTO-{timestamp}
-            storage_location_id: selectedStorage,
-            expiration_date: dataToSubmit.expiration_date,
-            food_name: dataToSubmit.name,
-            brand_name: dataToSubmit.brand_name || '',
-            // Photos
-            photo_thumb: dataToSubmit.photo_thumb,
-            photo_highres: dataToSubmit.photo_highres,
-            photo_user_uploaded: dataToSubmit.photo_user_uploaded,
-            // AI Vision metadata
-            ai_identified_name: dataToSubmit.ai_identified_name,
-            ai_confidence: dataToSubmit.ai_confidence,
-            // Nutrition data (works for both USDA and OFF)
-            nf_calories: dataToSubmit.calories,
-            nf_protein: dataToSubmit.protein,
-            nf_total_carbohydrate: dataToSubmit.total_carbohydrate,
-            nf_total_fat: dataToSubmit.total_fat,
-            nf_dietary_fiber: dataToSubmit.dietary_fiber,
-            nf_sugars: dataToSubmit.sugars,
-            nf_sodium: dataToSubmit.sodium,
-            // USDA-specific micronutrients
-            usda_calcium: dataToSubmit.calcium,
-            usda_iron: dataToSubmit.iron,
-            usda_potassium: dataToSubmit.potassium,
-            // USDA-specific fields
-            usda_fdc_id: dataToSubmit.fdc_id,
-            // OFF-specific fields
-            nutriscore_grade: dataToSubmit.nutriscore_grade,
-            nova_group: dataToSubmit.nova_group,
-            is_vegan: dataToSubmit.is_vegan,
-            is_vegetarian: dataToSubmit.is_vegetarian,
-            // Status
-            status: 'active',
-            volume_remaining: 100
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        console.log('✅ AI Vision item saved:', data.id);
+      if (updateError) {
+        console.error('❌ Failed to update status:', updateError);
+        throw updateError;
       }
 
-      // Two-step workflow - data already saved, just approve
-      const result = { success: true, corrections_submitted: !!corrections };
-
       const selectedLocation = storageLocations.find(loc => loc.id === selectedStorage);
-      const hasCorrections = result.corrections_submitted;
 
       Alert.alert(
         'Success! ✅',
-        `${correctedData.name} added to ${selectedLocation?.name}${hasCorrections ? ' (with corrections)' : ''}`,
+        `${correctedData.name} added to ${selectedLocation?.name}`,
         [
           { text: 'Scan Another', onPress: () => resetScanner() },
           { text: 'Done', onPress: () => resetScanner() }
@@ -343,9 +338,9 @@ export default function BarcodeScanner({ onProductScanned }) {
       onProductScanned?.(correctedData);
 
     } catch (error) {
-      console.error('❌ Error adding to inventory:', error);
-      Alert.alert('Error', error.message || 'Failed to add to inventory', [
-        { text: 'Try Again', onPress: () => setShowPreview(true) },
+      console.error('❌ Error finalizing inventory:', error);
+      Alert.alert('Error', error.message || 'Failed to finalize inventory item', [
+        { text: 'Try Again', onPress: () => setShowEditableReview(true) },
         { text: 'Cancel', onPress: () => resetScanner() }
       ]);
     } finally {
@@ -519,7 +514,7 @@ export default function BarcodeScanner({ onProductScanned }) {
     };
 
     setProductData(productDataFromAI);
-    setScannedData({ type: 'photo', data: photoBarcode });
+    setScannedData({ type: 'photo', barcode: photoBarcode });
 
     // Show storage location picker (same workflow as barcode)
     setShowLocationPicker(true);
