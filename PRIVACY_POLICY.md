@@ -1,7 +1,7 @@
 # Privacy Policy for Momma B's Scanner
 
 **Effective Date:** November 6, 2025
-**Last Updated:** November 6, 2025
+**Last Updated:** November 19, 2025
 
 ## Overview
 
@@ -14,7 +14,9 @@ Momma B's Scanner is a household inventory management app that helps you track f
 - **Account data:** Your household ID for organizing your inventory
 
 ### Information Automatically Collected
-- **Product data:** Nutrition facts, product names, brands, and photos retrieved from third-party APIs (Nutritionix, UPCitemdb, Open Food Facts)
+- **Product data:** Nutrition facts, product names, brands, and photos retrieved from third-party APIs (Open Food Facts, UPCitemdb, USDA FoodData Central)
+- **AI-identified data:** Product names and confidence scores from OpenAI GPT-4 Vision for produce/bulk items
+- **Photos:** User-uploaded photos for AI Vision identification (stored in Supabase Storage)
 - **Usage data:** Scan timestamps, OCR processing results
 
 ## How We Use Your Information
@@ -35,20 +37,25 @@ We use your information to:
 
 We use the following third-party services:
 
-### Nutritionix API
-- **Purpose:** Retrieve nutrition facts and product information
+### Open Food Facts API
+- **Purpose:** Retrieve nutrition facts, health scores, dietary information, and product photos
 - **Data shared:** Product barcodes
-- **Privacy Policy:** https://www.nutritionix.com/privacy
+- **Privacy Policy:** https://world.openfoodfacts.org/privacy
 
 ### UPCitemdb API
 - **Purpose:** Retrieve package size and product details
 - **Data shared:** Product barcodes
 - **Privacy Policy:** https://www.upcitemdb.com/privacy
 
-### Open Food Facts API
-- **Purpose:** Retrieve health scores, dietary information, and environmental data
-- **Data shared:** Product barcodes
-- **Privacy Policy:** https://world.openfoodfacts.org/privacy
+### USDA FoodData Central API
+- **Purpose:** Retrieve nutrition facts for fresh produce and raw foods
+- **Data shared:** Product names (for search)
+- **Privacy Policy:** https://www.usda.gov/privacy-policy
+
+### OpenAI API (GPT-4 Vision)
+- **Purpose:** Identify produce and bulk items from photos
+- **Data shared:** Product photos you upload
+- **Privacy Policy:** https://openai.com/policies/privacy-policy
 
 ### Supabase
 - **Purpose:** Database and backend infrastructure
@@ -103,4 +110,4 @@ This app's code and documentation may be made available under an open-source lic
 
 ---
 
-**Summary:** We collect the barcodes and expiration dates you scan, retrieve public product information from free APIs, and store everything securely in a database. We don't sell your data or share it with others. You control your data and can delete it anytime.
+**Summary:** We collect the barcodes and expiration dates you scan, photos you upload for AI identification, retrieve public product information from free APIs, and store everything securely in a database. We don't sell your data or share it with others. You control your data and can delete it anytime.

@@ -187,8 +187,7 @@ scanner/
 │   └── VolumeSelector.js
 ├── services/
 │   ├── scannerAPI.js            # Edge function calls
-│   ├── ocrService.js            # Google ML Kit wrapper
-│   └── nutritionix.js
+│   └── ocrService.js            # Google ML Kit wrapper
 ├── lib/supabase.js
 ├── .env                         # Secrets (gitignored)
 └── app.json                     # Expo config
@@ -203,13 +202,10 @@ scanner/
 ```bash
 EXPO_PUBLIC_SUPABASE_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY
-EXPO_PUBLIC_NUTRITIONIX_APP_ID
-EXPO_PUBLIC_NUTRITIONIX_API_KEY
 ```
 
 **Server (Supabase Secrets):**
 ```bash
-NUTRITIONIX_APP_ID, NUTRITIONIX_API_KEY
 OPENAI_API_KEY, USDA_API_KEY
 ```
 
@@ -340,7 +336,6 @@ supabase functions deploy identify-by-photo
 - **Supabase Dashboard:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk
 - **Supabase SQL Editor:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk/sql
 - **Edge Functions:** https://supabase.com/dashboard/project/bwglyyfcdjzvvjdxxjmk/functions
-- **Nutritionix API:** https://developer.nutritionix.com/
 - **UPCitemdb API:** https://devs.upcitemdb.com/
 - **Google ML Kit:** https://developers.google.com/ml-kit/vision/text-recognition
 

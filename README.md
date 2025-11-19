@@ -11,7 +11,8 @@ The Scanner module is a React Native/Expo mobile application that allows you to 
 ### Key Features
 - **Barcode Scanning**: Real-time UPC/EAN barcode recognition via vision-camera
 - **OCR Expiration Dates**: ML Kit text recognition for automatic expiration date capture
-- **Nutritional Data**: Automatic lookup via Nutritionix API
+- **Multi-Source Data**: Automatic lookup via Open Food Facts, UPCitemdb, and USDA APIs
+- **AI Vision**: OpenAI GPT-4 Vision for produce/bulk item identification
 - **Inventory Integration**: Direct sync with household inventory system
 - **Offline Capability**: Scan items offline, sync when connected
 - **Storage Locations**: Assign items to pantry, freezer, etc.
@@ -46,7 +47,7 @@ The Scanner module is a React Native/Expo mobile application that allows you to 
 
 ### API Keys Required
 - **Supabase**: Project URL and anon key (configured in `.env`)
-- **Nutritionix API**: App ID and key for nutritional data lookup
+- **Server-side APIs** (configured in Supabase Secrets): OpenAI, USDA
 
 ---
 
@@ -130,14 +131,19 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### Services
 - **supabase.js**: Database client and authentication
 - **scannerAPI.js**: API layer for inventory operations
-- **nutritionix.js**: Nutritional data lookup service
 
 ### Data Flow
 1. User scans barcode → Camera captures UPC/EAN code
-2. App queries Nutritionix API → Retrieves product information
+2. App queries multiple APIs → Retrieves product information (OFF, UPC, USDA)
 3. User reviews and confirms → Assigns storage location
 4. Data sent to Supabase → Updates household inventory
-5. Real-time sync → Available across all modules
+
+### AI Vision Flow (for produce/bulk items)
+1. User captures photo → Uploads to Supabase Storage
+2. OpenAI GPT-4 Vision identifies item → Returns name and confidence
+3. USDA + Open Food Facts searched in parallel → Returns nutrition data
+4. User selects best match → Assigns storage location
+5. Data sent to Supabase → Updates household inventory
 
 ---
 
@@ -174,9 +180,11 @@ eas build --platform ios --profile preview
 - **History**: Scan history and item tracking
 - **Edge Functions**: Server-side barcode processing
 
-### Nutritionix API
-- **Product Lookup**: UPC/EAN code to product information
-- **Nutritional Data**: Calories, ingredients, allergens
+### Multi-Source APIs
+- **Open Food Facts**: Product data, nutrition, health scores (unlimited free)
+- **UPCitemdb**: Package sizes, pricing (100/day free)
+- **USDA FoodData Central**: Fresh produce nutrition (free with API key)
+- **OpenAI GPT-4 Vision**: AI-powered item identification
 - **Brand Information**: Product names and manufacturers
 
 ### Other Modules
@@ -192,7 +200,8 @@ eas build --platform ios --profile preview
 - Barcode scanning with camera
 - User authentication system
 - Supabase database integration
-- Nutritionix API integration
+- Multi-source API integration (Open Food Facts, UPCitemdb, USDA)
+- AI Vision integration (OpenAI GPT-4)
 - iOS app configuration
 - Apple Developer account setup
 
@@ -255,7 +264,7 @@ scanner/
 │   └── AuthContext.js      # Authentication state
 ├── services/               # API integrations
 │   ├── scannerAPI.js       # Inventory API layer
-│   └── nutritionix.js      # Nutritionix integration
+│   └── ocrService.js       # ML Kit OCR integration
 ├── lib/                    # Core utilities
 │   └── supabase.js         # Database client
 ├── docs/                   # Documentation
@@ -274,12 +283,14 @@ scanner/
 
 ### Optional Costs
 - **EAS Pro**: $99/month (only if heavy building needed)
-- **Nutritionix Premium**: Based on API usage
+- **OpenAI API**: Pay-per-use for AI Vision (GPT-4 Vision ~$0.01-0.03 per image)
 
 ### Free Tier Limits
 - **EAS Build**: Sufficient for most development
 - **Supabase**: Covers household-scale usage
-- **Nutritionix**: 500 requests/day free
+- **Open Food Facts**: Unlimited free
+- **UPCitemdb**: 100 requests/day free
+- **USDA FoodData Central**: Free with API key
 
 ---
 
@@ -294,7 +305,10 @@ scanner/
 - [Expo Documentation](https://docs.expo.dev/)
 - [React Native Documentation](https://reactnative.dev/)
 - [Supabase Documentation](https://supabase.com/docs)
-- [Nutritionix API Documentation](https://developer.nutritionix.com/)
+- [Open Food Facts API](https://world.openfoodfacts.org/data)
+- [UPCitemdb API](https://devs.upcitemdb.com/)
+- [USDA FoodData Central](https://fdc.nal.usda.gov/api-guide.html)
+- [OpenAI API Documentation](https://platform.openai.com/docs)
 
 ---
 
