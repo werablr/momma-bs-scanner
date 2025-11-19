@@ -6,9 +6,9 @@
 
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
-**Purpose:** Data ingestion via barcode scanning + AI vision identification
-**Status:** ✅ **OPERATIONAL** - Authentication, RLS, Barcode Scanning, and AI Vision working
-**Last Updated:** November 17, 2025
+**Purpose:** Complete data ingestion via barcode scanning + AI vision identification
+**Status:** 🔥 **REFACTORING** - Removing Nutritionix legacy, implementing complete multi-source data capture
+**Last Updated:** November 19, 2025
 
 ---
 
@@ -112,13 +112,14 @@
 -- Core identifiers
 id, household_id, barcode, scanned_at
 
--- Product info (multi-source)
-food_name, brand_name, nix_brand_id, nix_item_id
+-- Product info
+food_name, brand_name
 
--- Nutrition (40+ fields)
-nf_calories, nf_total_fat, nf_protein, nf_sodium, etc.
-off_calories, upc_calories, usda_calories  -- Source-specific
-full_nutrients JSONB, alt_measures JSONB, tags JSONB
+-- Nutrition (source-specific columns for complete data capture)
+usda_calories, usda_protein, usda_total_fat, usda_vitamin_a, etc. (150+ USDA nutrients)
+off_calories, off_protein, off_total_fat, off_nutriscore, etc. (all OFF fields)
+upc_calories, upc_protein, upc_total_fat, etc. (all UPC fields)
+user_calories, user_protein, user_total_fat, etc. (manual overrides - SSOT)
 
 -- Photos
 photo_thumb, photo_highres, photo_user_uploaded
@@ -134,9 +135,12 @@ status (pending, active, low, expired, consumed)
 ```
 
 **Multi-Source Data Strategy:**
-- Store each API separately: `off_calories`, `upc_calories`, `usda_calories`
-- Single source of truth: `nf_calories` = `COALESCE(user, usda, off, upc)`
-- Benefits: Data provenance, quality comparison, no data loss
+- **Capture EVERYTHING:** Store ALL fields from each API (USDA: 150+ nutrients, OFF: all nutrition + health scores, UPC: all available)
+- **Source-specific columns:** `usda_calories`, `off_calories`, `upc_calories`, `user_calories`
+- **User override is SSOT:** `user_*` fields trump all API data when populated
+- **Display in Pantry:** `COALESCE(user_calories, usda_calories, off_calories, upc_calories)`
+- **No `nf_*` fields:** Nutritionix legacy removed - no stored computed columns
+- **Benefits:** Complete data provenance, quality comparison, zero data loss, future-proof
 
 ### Helper Functions
 ```sql

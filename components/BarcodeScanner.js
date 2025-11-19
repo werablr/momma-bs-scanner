@@ -162,7 +162,7 @@ export default function BarcodeScanner({ onProductScanned }) {
             // AI Vision metadata
             ai_identified_name: productData.ai_identified_name,
             ai_confidence: productData.ai_confidence,
-            // Nutrition data (works for both USDA and OFF)
+            // Nutrition data (nf_* = display/SSoT)
             nf_calories: productData.calories,
             nf_protein: productData.protein,
             nf_total_carbohydrate: productData.total_carbohydrate,
@@ -170,13 +170,26 @@ export default function BarcodeScanner({ onProductScanned }) {
             nf_dietary_fiber: productData.dietary_fiber,
             nf_sugars: productData.sugars,
             nf_sodium: productData.sodium,
-            // USDA-specific micronutrients
-            usda_calcium: productData.calcium,
-            usda_iron: productData.iron,
-            usda_potassium: productData.potassium,
-            // USDA-specific fields
-            usda_fdc_id: productData.fdc_id,
-            // OFF-specific fields
+            // USDA-specific fields (if USDA source)
+            usda_calories: productData.usda_calories,
+            usda_protein: productData.usda_protein,
+            usda_total_carbohydrate: productData.usda_total_carbohydrate,
+            usda_total_fat: productData.usda_total_fat,
+            usda_dietary_fiber: productData.usda_dietary_fiber,
+            usda_sugars: productData.usda_sugars,
+            usda_sodium: productData.usda_sodium,
+            usda_calcium: productData.usda_calcium || productData.calcium,
+            usda_iron: productData.usda_iron || productData.iron,
+            usda_potassium: productData.usda_potassium || productData.potassium,
+            usda_fdc_id: productData.usda_fdc_id || productData.fdc_id,
+            // OFF-specific fields (if OFF source)
+            off_calories: productData.off_calories,
+            off_protein: productData.off_protein,
+            off_total_carbohydrate: productData.off_total_carbohydrate,
+            off_total_fat: productData.off_total_fat,
+            off_dietary_fiber: productData.off_dietary_fiber,
+            off_sugars: productData.off_sugars,
+            off_sodium: productData.off_sodium,
             nutriscore_grade: productData.nutriscore_grade,
             nova_group: productData.nova_group,
             is_vegan: productData.is_vegan,
@@ -491,26 +504,57 @@ export default function BarcodeScanner({ onProductScanned }) {
       ai_identified_name: aiResult.aiIdentification.name,
       ai_confidence: aiResult.aiIdentification.confidence,
       data_source: match.source || 'off', // Track whether USDA or OFF
-      // Nutrition data (works for both USDA and OFF)
-      calories: match.nutrition?.energy_kcal || null,
-      protein: match.nutrition?.proteins || null,
-      total_carbohydrate: match.nutrition?.carbohydrates || null,
-      total_fat: match.nutrition?.fat || null,
-      dietary_fiber: match.nutrition?.fiber || null,
-      sugars: match.nutrition?.sugars || null,
-      sodium: match.nutrition?.sodium || null,
-      // USDA-specific micronutrients
-      calcium: match.nutrition?.calcium || null,
-      iron: match.nutrition?.iron || null,
-      potassium: match.nutrition?.potassium || null,
-      // USDA-specific fields
-      fdc_id: match.fdc_id || null,
-      scientific_name: match.scientific_name || null,
-      // OFF-specific fields
-      nutriscore_grade: match.nutriscore_grade || null,
-      nova_group: match.nova_group || null,
-      is_vegan: match.vegan === 1,
-      is_vegetarian: match.vegetarian === 1,
+
+      // Map nutrition data based on source
+      ...(match.source === 'usda' ? {
+        // USDA nutrition → usda_* fields (source-specific)
+        usda_calories: match.nutrition?.energy_kcal || null,
+        usda_protein: match.nutrition?.proteins || null,
+        usda_total_carbohydrate: match.nutrition?.carbohydrates || null,
+        usda_total_fat: match.nutrition?.fat || null,
+        usda_dietary_fiber: match.nutrition?.fiber || null,
+        usda_sugars: match.nutrition?.sugars || null,
+        usda_sodium: match.nutrition?.sodium || null,
+        usda_calcium: match.nutrition?.calcium || null,
+        usda_iron: match.nutrition?.iron || null,
+        usda_potassium: match.nutrition?.potassium || null,
+        usda_fdc_id: match.fdc_id || null,
+        // Also populate nf_* as fallback display (SSoT)
+        calories: match.nutrition?.energy_kcal || null,
+        protein: match.nutrition?.proteins || null,
+        total_carbohydrate: match.nutrition?.carbohydrates || null,
+        total_fat: match.nutrition?.fat || null,
+        dietary_fiber: match.nutrition?.fiber || null,
+        sugars: match.nutrition?.sugars || null,
+        sodium: match.nutrition?.sodium || null,
+        calcium: match.nutrition?.calcium || null,
+        iron: match.nutrition?.iron || null,
+        potassium: match.nutrition?.potassium || null,
+        fdc_id: match.fdc_id || null,
+        scientific_name: match.scientific_name || null,
+      } : {
+        // OFF nutrition → off_* fields (source-specific)
+        off_calories: match.nutrition?.energy_kcal || null,
+        off_protein: match.nutrition?.proteins || null,
+        off_total_carbohydrate: match.nutrition?.carbohydrates || null,
+        off_total_fat: match.nutrition?.fat || null,
+        off_dietary_fiber: match.nutrition?.fiber || null,
+        off_sugars: match.nutrition?.sugars || null,
+        off_sodium: match.nutrition?.sodium || null,
+        // Also populate nf_* as fallback display (SSoT)
+        calories: match.nutrition?.energy_kcal || null,
+        protein: match.nutrition?.proteins || null,
+        total_carbohydrate: match.nutrition?.carbohydrates || null,
+        total_fat: match.nutrition?.fat || null,
+        dietary_fiber: match.nutrition?.fiber || null,
+        sugars: match.nutrition?.sugars || null,
+        sodium: match.nutrition?.sodium || null,
+        // OFF-specific fields
+        nutriscore_grade: match.nutriscore_grade || null,
+        nova_group: match.nova_group || null,
+        is_vegan: match.vegan === 1,
+        is_vegetarian: match.vegetarian === 1,
+      }),
     };
 
     setProductData(productDataFromAI);
