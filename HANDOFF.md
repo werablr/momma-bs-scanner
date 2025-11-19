@@ -256,13 +256,15 @@ supabase functions deploy identify-by-photo
 ## 🚀 NEXT STEPS (PRIORITY ORDER)
 
 ### Immediate (Current Session)
-1. **🔥 Fix AI Vision Photo Upload Issue**
-   - Current problem: Edge function cannot fetch from Supabase Storage (500 error)
-   - OpenAI also cannot download from Supabase Storage URLs (invalid_image_url error)
-   - Solution needed: Send base64 photo data directly from iPhone to edge function, bypassing Storage upload
-   - Status: Unified workflow implemented (AI Vision creates DB record in step 1), but photo delivery to OpenAI broken
+1. **🔥 Fix RLS Policy for AI Vision Database Insert**
+   - **Status:** AI Vision working! Successfully identified "Bartlett Pear" with 95% confidence
+   - **Issue:** Database INSERT fails with "permission denied for table users"
+   - **Root Cause:** RLS policy references `auth.users.household_id` which doesn't exist
+   - **Current Action:** Running diagnostic SQL to identify existing policies vs what should exist
+   - **Next:** Fix RLS policies to use `user_households` table instead of `auth.users`
+   - **File:** `/Users/macmini/Desktop/momma-bs-scanner/diagnose_rls_policies.sql`
 
-2. **Test pear scanning end-to-end** after photo delivery fix
+2. **Test pear scanning end-to-end** after RLS fix
 3. **Document issues** in [Kitchen/TESTING.md](../Momma B's Kitchen/TESTING.md)
 
 ### Short-Term (1-2 Weeks)
@@ -309,18 +311,19 @@ supabase functions deploy identify-by-photo
 ## 💡 QUICK START FOR NEXT SESSION
 
 **Context Summary:**
-- Scanner app operational: barcode workflow ✅, AI Vision workflow ❌ (photo delivery issue)
+- Scanner app operational: barcode workflow ✅, AI Vision workflow ⚠️ (RLS policy issue)
 - Unified two-step workflow implemented for both barcode and AI Vision items
 - AI Vision creates DB record in step 1 (same as barcode), updates in step 2
 - USDA reintegrated for fresh produce (searches USDA + OFF in parallel)
-- Current blocker: Edge function/OpenAI cannot access Supabase Storage URLs
-- Next action: Send base64 photo directly from iPhone to edge function
+- **✅ AI Vision SUCCESS:** Edge function identifies "Bartlett Pear" at 95% confidence, finds 5 USDA matches
+- **❌ Current blocker:** RLS policy references non-existent `auth.users.household_id` column
+- Next action: Fix RLS policies to use `user_households` table
 
 **Most Likely Next Tasks:**
-1. Fix photo delivery: Send base64 from iPhone → edge function → OpenAI (bypass Storage)
-2. Test pear scanning end-to-end
-3. Verify pear data saves to inventory_items table
-4. Build AI Vision product selection screen (if needed)
+1. Run diagnostic SQL in Supabase to see current RLS policies
+2. Fix RLS policies to use `user_households` junction table
+3. Test pear scanning end-to-end
+4. Verify pear data saves to inventory_items table
 
 **Testing Checklist:**
 - [ ] Scan barcode item end-to-end

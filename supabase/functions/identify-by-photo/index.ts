@@ -36,7 +36,16 @@ async function identifyFoodWithAI(imageUrl: string, openaiApiKey: string): Promi
   }
 
   const imageBuffer = await imageResponse.arrayBuffer()
-  const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)))
+
+  // Convert to base64 in chunks to avoid stack overflow
+  const bytes = new Uint8Array(imageBuffer)
+  const chunkSize = 8192
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize)
+    binary += String.fromCharCode.apply(null, Array.from(chunk))
+  }
+  const base64Image = btoa(binary)
   const base64DataUrl = `data:image/jpeg;base64,${base64Image}`
 
   console.log('Converted image to base64, size:', base64Image.length)
