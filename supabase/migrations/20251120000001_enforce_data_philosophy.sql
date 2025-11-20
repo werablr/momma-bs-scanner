@@ -71,18 +71,30 @@ SELECT
     i.is_palm_oil_free,
 
     -- ENFORCED PHILOSOPHY: Best nutrition values (user > usda > off > upc)
+    -- Note: UPC only provides calories, protein, total_fat, sodium (4 fields)
     get_best_value(i.user_calories, i.usda_calories, i.off_calories, i.upc_calories) AS calories,
     get_best_value(i.user_protein, i.usda_protein, i.off_protein, i.upc_protein) AS protein,
     get_best_value(i.user_total_fat, i.usda_total_fat, i.off_total_fat, i.upc_total_fat) AS total_fat,
-    get_best_value(i.user_total_carbohydrate, i.usda_total_carbohydrate, i.off_total_carbohydrate, i.upc_total_carbohydrate) AS total_carbohydrate,
     get_best_value(i.user_sodium, i.usda_sodium, i.off_sodium, i.upc_sodium) AS sodium,
+    -- UPC doesn't provide these fields, so use NULL as 4th parameter
+    get_best_value(i.user_total_carbohydrate, i.usda_total_carbohydrate, i.off_total_carbohydrate, NULL) AS total_carbohydrate,
+    get_best_value(i.user_dietary_fiber, i.usda_dietary_fiber, i.off_dietary_fiber, NULL) AS dietary_fiber,
+    get_best_value(i.user_sugars, i.usda_sugars, i.off_sugars, NULL) AS sugars,
+    get_best_value(i.user_saturated_fat, i.usda_saturated_fat, i.off_saturated_fat, NULL) AS saturated_fat,
+    get_best_value(i.user_potassium, i.usda_potassium, i.off_potassium, NULL) AS potassium,
 
     -- Source-specific values (for transparency/comparison)
+    -- UPC source (only 4 fields)
     i.user_calories, i.usda_calories, i.off_calories, i.upc_calories,
     i.user_protein, i.usda_protein, i.off_protein, i.upc_protein,
     i.user_total_fat, i.usda_total_fat, i.off_total_fat, i.upc_total_fat,
-    i.user_total_carbohydrate, i.usda_total_carbohydrate, i.off_total_carbohydrate, i.upc_total_carbohydrate,
     i.user_sodium, i.usda_sodium, i.off_sodium, i.upc_sodium,
+    -- USDA and OFF sources (more complete)
+    i.user_total_carbohydrate, i.usda_total_carbohydrate, i.off_total_carbohydrate,
+    i.user_dietary_fiber, i.usda_dietary_fiber, i.off_dietary_fiber,
+    i.user_sugars, i.usda_sugars, i.off_sugars,
+    i.user_saturated_fat, i.usda_saturated_fat, i.off_saturated_fat,
+    i.user_potassium, i.usda_potassium, i.off_potassium,
 
     -- Raw API data (complete capture)
     i.openfoodfacts_raw_data,
