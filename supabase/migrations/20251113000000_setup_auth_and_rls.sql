@@ -42,6 +42,8 @@ ALTER TABLE public.inventory_history ENABLE ROW LEVEL SECURITY;
 -- RLS POLICIES FOR HOUSEHOLDS
 -- ============================================================================
 
+DROP POLICY IF EXISTS "Users can view their households" ON public.households;
+
 CREATE POLICY "Users can view their households"
 ON public.households FOR SELECT
 USING (
@@ -54,6 +56,8 @@ USING (
 -- ============================================================================
 -- RLS POLICIES FOR USER_HOUSEHOLDS
 -- ============================================================================
+
+DROP POLICY IF EXISTS "Users can view their household memberships" ON public.user_households;
 
 CREATE POLICY "Users can view their household memberships"
 ON public.user_households FOR SELECT

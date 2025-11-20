@@ -162,14 +162,6 @@ export default function BarcodeScanner({ onProductScanned }) {
             // AI Vision metadata
             ai_identified_name: productData.ai_identified_name,
             ai_confidence: productData.ai_confidence,
-            // Nutrition data (nf_* = display/SSoT)
-            nf_calories: productData.calories,
-            nf_protein: productData.protein,
-            nf_total_carbohydrate: productData.total_carbohydrate,
-            nf_total_fat: productData.total_fat,
-            nf_dietary_fiber: productData.dietary_fiber,
-            nf_sugars: productData.sugars,
-            nf_sodium: productData.sodium,
             // USDA-specific fields (if USDA source)
             usda_calories: productData.usda_calories,
             usda_protein: productData.usda_protein,
@@ -541,7 +533,7 @@ export default function BarcodeScanner({ onProductScanned }) {
         off_dietary_fiber: match.nutrition?.fiber || null,
         off_sugars: match.nutrition?.sugars || null,
         off_sodium: match.nutrition?.sodium || null,
-        // Also populate nf_* as fallback display (SSoT)
+        // Display values (computed by Pantry app using COALESCE)
         calories: match.nutrition?.energy_kcal || null,
         protein: match.nutrition?.proteins || null,
         total_carbohydrate: match.nutrition?.carbohydrates || null,

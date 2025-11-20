@@ -243,9 +243,6 @@ serve(async (req) => {
           }
         }
 
-        // Select best nutrition values (OFF > UPC) - USDA enrichment handled by Pantry app
-        const bestNutrition = selectBestNutrition(offNutrition, upcNutrition)
-
         // Extract Open Food Facts health/environmental data
         const offExtracted = extractOpenFoodFactsData(openfoodfactsData)
 
@@ -303,19 +300,7 @@ serve(async (req) => {
             upc_total_fat: upcNutrition.upc_total_fat,
             upc_sodium: upcNutrition.upc_sodium,
 
-            // Single Source of Truth (best values - displayed in UI)
-            nf_calories: bestNutrition.nf_calories,
-            nf_total_fat: bestNutrition.nf_total_fat,
-            nf_saturated_fat: bestNutrition.nf_saturated_fat,
-            nf_cholesterol: bestNutrition.nf_cholesterol,
-            nf_sodium: bestNutrition.nf_sodium,
-            nf_total_carbohydrate: bestNutrition.nf_total_carbohydrate,
-            nf_dietary_fiber: bestNutrition.nf_dietary_fiber,
-            nf_sugars: bestNutrition.nf_sugars,
-            nf_protein: bestNutrition.nf_protein,
-            nf_potassium: bestNutrition.nf_potassium,
-
-            // Additional metadata (photos from USDA or OFF)
+            // Photos from OFF or UPC
             photo_thumb: product.photo_thumb,
             photo_highres: product.photo_highres,
 
@@ -375,10 +360,11 @@ serve(async (req) => {
               brand: product.brand_name,
               serving_size: product.serving_qty,
               serving_unit: product.serving_unit,
-              calories: bestNutrition.nf_calories,
-              protein: bestNutrition.nf_protein,
-              carbs: bestNutrition.nf_total_carbohydrate,
-              fat: bestNutrition.nf_total_fat,
+              // Display uses COALESCE(user_*, usda_*, off_*, upc_*) in Pantry app
+              calories: offNutrition.off_calories ?? upcNutrition.upc_calories ?? null,
+              protein: offNutrition.off_protein ?? upcNutrition.upc_protein ?? null,
+              carbs: offNutrition.off_total_carbohydrate ?? null,
+              fat: offNutrition.off_total_fat ?? upcNutrition.upc_total_fat ?? null,
             },
             suggested_category: categorizeProduct(product),
             confidence_score: 1.0,
@@ -549,35 +535,6 @@ function extractUPCProduct(item: any) {
     serving_weight_grams: null,
     photo_thumb: item.images?.[0] || null,
     photo_highres: item.images?.[0] || null,
-  }
-}
-
-// Select nutrition values for display (nf_* fields)
-// PHILOSOPHY: All API sources are equal - no hierarchy, no "better" source
-// EXCEPTION: User input ALWAYS takes priority when present (user knows best)
-// CURRENT STRATEGY: Use first available value (USER → OFF → UPC order)
-//   - User input = highest priority (they looked at the label!)
-//   - API order is NOT a quality hierarchy, just pragmatic "use what we got first"
-//   - All source-specific values (user_*, usda_*, off_*, upc_*) are ALWAYS stored separately
-//   - USDA enrichment handled by Pantry app (user validates fuzzy matches)
-// FUTURE: Will analyze real data (20-50 scans) to determine best selection logic:
-//   - Average all available sources?
-//   - Weighted average based on observed accuracy?
-//   - Per-nutrient logic (e.g., government data for macros, community data for allergens)?
-//   - User choice per item in Pantry app?
-// THIS FUNCTION IS TEMPORARY - Easy to change once we have data to inform the decision
-function selectBestNutrition(offNutrition: any, upcNutrition: any, userNutrition: any = {}) {
-  return {
-    nf_calories: userNutrition.user_calories ?? offNutrition.off_calories ?? upcNutrition.upc_calories ?? null,
-    nf_protein: userNutrition.user_protein ?? offNutrition.off_protein ?? upcNutrition.upc_protein ?? null,
-    nf_total_fat: userNutrition.user_total_fat ?? offNutrition.off_total_fat ?? upcNutrition.upc_total_fat ?? null,
-    nf_saturated_fat: userNutrition.user_saturated_fat ?? offNutrition.off_saturated_fat ?? null,
-    nf_cholesterol: userNutrition.user_cholesterol ?? null, // OFF doesn't track cholesterol, USDA enrichment via Pantry
-    nf_sodium: userNutrition.user_sodium ?? offNutrition.off_sodium ?? upcNutrition.upc_sodium ?? null,
-    nf_total_carbohydrate: userNutrition.user_total_carbohydrate ?? offNutrition.off_total_carbohydrate ?? null,
-    nf_dietary_fiber: userNutrition.user_dietary_fiber ?? offNutrition.off_dietary_fiber ?? null,
-    nf_sugars: userNutrition.user_sugars ?? offNutrition.off_sugars ?? null,
-    nf_potassium: userNutrition.user_potassium ?? offNutrition.off_potassium ?? null,
   }
 }
 

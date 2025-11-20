@@ -7,8 +7,8 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Complete data ingestion via barcode scanning + AI vision identification
-**Status:** 🔥 **REFACTORING** - Removing Nutritionix legacy, implementing complete multi-source data capture
-**Last Updated:** November 19, 2025
+**Status:** ✅ **CLEAN** - Nutritionix eliminated, complete multi-source data capture operational
+**Last Updated:** November 20, 2025
 
 ---
 
@@ -116,10 +116,15 @@ id, household_id, barcode, scanned_at
 food_name, brand_name
 
 -- Nutrition (source-specific columns for complete data capture)
-usda_calories, usda_protein, usda_total_fat, usda_vitamin_a, etc. (150+ USDA nutrients)
-off_calories, off_protein, off_total_fat, off_nutriscore, etc. (all OFF fields)
-upc_calories, upc_protein, upc_total_fat, etc. (all UPC fields)
+usda_calories, usda_protein, usda_total_fat, usda_calcium, usda_iron, etc. (~16 USDA nutrients currently)
+off_calories, off_protein, off_total_fat, off_nutriscore, etc. (~10 OFF nutrients currently)
+upc_calories, upc_protein, upc_total_fat, upc_sodium (~4 UPC nutrients currently)
 user_calories, user_protein, user_total_fat, etc. (manual overrides - SSOT)
+
+-- Raw API responses (JSONB - contains ALL fields)
+openfoodfacts_raw_data JSONB  -- ~238 fields available
+upcitemdb_raw_data JSONB
+usda_raw_data JSONB            -- ~150+ nutrients available
 
 -- Photos
 photo_thumb, photo_highres, photo_user_uploaded
@@ -135,12 +140,13 @@ status (pending, active, low, expired, consumed)
 ```
 
 **Multi-Source Data Strategy:**
-- **Capture EVERYTHING:** Store ALL fields from each API (USDA: 150+ nutrients, OFF: all nutrition + health scores, UPC: all available)
-- **Source-specific columns:** `usda_calories`, `off_calories`, `upc_calories`, `user_calories`
-- **User override is SSOT:** `user_*` fields trump all API data when populated
-- **Display in Pantry:** `COALESCE(user_calories, usda_calories, off_calories, upc_calories)`
-- **No `nf_*` fields:** Nutritionix legacy removed - no stored computed columns
-- **Benefits:** Complete data provenance, quality comparison, zero data loss, future-proof
+- **✅ Capture EVERYTHING:** Raw JSONB stores ALL API fields (USDA: 150+ nutrients, OFF: 238 fields, UPC: all available)
+- **✅ Source-specific columns:** `usda_calories`, `off_calories`, `upc_calories`, `user_calories` (typed for fast queries)
+- **✅ User override is SSOT:** `user_*` fields trump all API data when populated
+- **✅ Display in Pantry:** `COALESCE(user_calories, usda_calories, off_calories, upc_calories)`
+- **✅ No `nf_*` fields:** Nutritionix legacy ELIMINATED (Nov 20, 2025) - no stored computed columns
+- **✅ Benefits:** Complete data provenance, quality comparison, zero data loss, future-proof
+- **📋 Next Phase:** Add 80+ priority micronutrient columns (vitamins, minerals, amino acids) - See [API_FIELDS_AVAILABLE.md](docs/API_FIELDS_AVAILABLE.md)
 
 ### Helper Functions
 ```sql
@@ -357,6 +363,14 @@ supabase functions deploy identify-by-photo
 **TestFlight Setup (Nov 6):** Security hardened, credentials moved to 1Password, repository public
 **AI Vision Bug (Nov 14):** Fixed JSON parsing (OpenAI wraps response in markdown code fences)
 **Photo Storage (Nov 14):** Fixed duplicate path in upload URLs
+
+**Nutritionix Elimination (Nov 20):** Complete removal of all Nutritionix legacy code
+  - ✅ Database: Dropped all `nf_*` columns, `nutritionix_data`, `nix_*` columns
+  - ✅ Edge Functions: Removed `nf_*` population, deleted `selectBestNutrition()` function
+  - ✅ Pantry App: Implemented COALESCE(user_*, usda_*, off_*, upc_*) display logic
+  - ✅ Scanner App: Removed `nf_*` references from components
+  - ✅ Philosophy: "Capture Everything, Show the Best" - Zero data loss, complete provenance
+  - 📋 Next: Expand schema with 80+ micronutrient columns (see API_FIELDS_AVAILABLE.md)
 
 **Critical Lesson:** Built Ad Hoc without discussing strategy first - always use TestFlight for long-term distribution
 
