@@ -1,9 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// SECURITY: Restrict CORS to known origins
+const ALLOWED_ORIGINS = [
+  'https://momma-bs-pantry.vercel.app',  // Production Pantry app
+  'http://localhost:3000',                // Local Pantry dev
+  'http://localhost:3001',                // Local Pantry dev (alternate port)
+  'http://192.168.0.211:3000',            // Local network dev
+  'http://192.168.0.211:3001',            // Local network dev (alternate port)
+  'exp://192.168.0.211:8081',             // Expo development
+]
+
+function getCorsHeaders(origin: string | null) {
+  // Check if origin is allowed
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
 // Helper function to log to database
@@ -301,7 +316,41 @@ function calculateMatchScore(searchTerm: string, productName: string, brands: st
   return score
 }
 
+// Helper function to get user's household_id from JWT
+async function getUserHouseholdId(supabaseClient: any, authHeader: string | null): Promise<string | null> {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  // Verify the JWT and get the user
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
+
+  if (userError || !user) {
+    console.error('Failed to verify user token:', userError)
+    return null
+  }
+
+  // Look up the user's household from user_households table
+  const { data: userHousehold, error: householdError } = await supabaseClient
+    .from('user_households')
+    .select('household_id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (householdError || !userHousehold) {
+    console.error('Failed to get user household:', householdError)
+    return null
+  }
+
+  return userHousehold.household_id
+}
+
 serve(async (req) => {
+  const origin = req.headers.get('Origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -309,7 +358,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json()
-    const { photo_url, household_id, storage_location_id } = requestBody
+    const { photo_url, storage_location_id } = requestBody
 
     if (!photo_url) {
       return new Response(
@@ -324,7 +373,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    await dbLog(supabaseClient, 'info', 'AI photo identification started', { photo_url, household_id })
+    // SECURITY: Get household_id from authenticated user's JWT
+    const authHeader = req.headers.get('Authorization')
+    const householdId = await getUserHouseholdId(supabaseClient, authHeader)
+
+    if (!householdId) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Unauthorized: Valid authentication required'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      )
+    }
+
+    await dbLog(supabaseClient, 'info', 'AI photo identification started', { photo_url, householdId })
 
     // Get OpenAI API key from environment
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
@@ -398,9 +464,9 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    // SECURITY: Log full error details server-side only
     console.error('Error in identify-by-photo:', error)
     console.error('Error stack:', error.stack)
-    console.error('Error details:', JSON.stringify(error, null, 2))
 
     // Try to log to database (but don't fail if it errors)
     try {
@@ -417,12 +483,11 @@ serve(async (req) => {
       console.error('Failed to log error to database:', logError)
     }
 
+    // SECURITY: Return generic error to client (don't expose internal details)
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Unknown error occurred',
-        error_name: error.name,
-        error_details: error.toString()
+        error: 'An error occurred while processing the image. Please try again.'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

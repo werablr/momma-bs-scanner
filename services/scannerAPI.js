@@ -339,14 +339,14 @@ class ScannerAPI {
   }
 
   // AI Vision: Identify food by photo
-  async identifyByPhoto(photoUrl, householdId = '7c093e13-4bcf-463e-96c1-9f499de9c4f2') {
+  // Note: household_id is now extracted from JWT in edge function, not passed from client
+  async identifyByPhoto(photoUrl) {
     try {
       console.log('🤖 Calling AI Vision API with photo:', photoUrl);
 
       const { data, error } = await supabase.functions.invoke('identify-by-photo', {
         body: {
-          photo_url: photoUrl,
-          household_id: householdId
+          photo_url: photoUrl
         }
       });
 

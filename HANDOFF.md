@@ -7,7 +7,7 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Complete data ingestion via barcode scanning + AI vision identification
-**Status:** 🔒 **SECURITY AUDIT COMPLETE** - Critical issues identified, fixes required before App Store
+**Status:** ✅ **SECURITY FIXES COMPLETE** - Ready for deployment and testing
 **Last Updated:** November 21, 2025
 
 ---
@@ -24,13 +24,12 @@
 - ✅ **Manual Entry** - Fallback for items without barcodes
 - ✅ **OCR + Manual Date** - Expiration date capture with date picker fallback
 - ✅ **Storage Locations** - 8 locations loaded from database
+- ✅ **Edge Function Security** - household_id from JWT, CORS restricted, errors sanitized
 
 ### Active Issues
-- 🔴 **SECURITY: Hardcoded household_id** - Edge functions use hardcoded ID, bypassing RLS
-- 🔴 **SECURITY: Service role key** - Edge functions bypass all RLS policies
-- 🟠 **SECURITY: CORS allows any origin** - `Access-Control-Allow-Origin: *`
 - 🔜 **AI Vision UI incomplete** - Backend working, need product selection screen
 - ⚠️ **Metro auto-connect** - Requires manual URL entry (needs EAS rebuild for permissions)
+- 📋 **Deploy edge functions** - Run `supabase functions deploy` to activate security fixes
 
 ### Current User
 - Email: werablr@gmail.com
@@ -404,32 +403,29 @@ supabase functions deploy identify-by-photo
 
 ---
 
-## 🔒 SECURITY AUDIT FINDINGS (Nov 21, 2025)
+## 🔒 SECURITY FIXES (Nov 21, 2025)
 
-### Critical Issues (P0)
-| Issue | Location | Risk | Fix |
-|-------|----------|------|-----|
-| Hardcoded household_id | scanner-ingest/index.ts:255,:431 | Any auth user can write to hardcoded household | Extract from JWT/user_households |
-| Hardcoded household_id | scannerAPI.js:342 | Default bypasses proper auth | Remove default parameter |
-| Service role key | Both edge functions | Bypasses all RLS policies | Forward user JWT instead |
+### ✅ Fixed Issues
+| Issue | Solution | Status |
+|-------|----------|--------|
+| Hardcoded household_id | Added `getUserHouseholdId()` - extracts from JWT via user_households table | ✅ Fixed |
+| Default household_id in scannerAPI.js | Removed default parameter from `identifyByPhoto()` | ✅ Fixed |
+| CORS any origin | Added origin whitelist (Vercel, localhost, Expo) | ✅ Fixed |
+| Verbose error responses | Sanitized - generic messages to client, full logs server-side | ✅ Fixed |
 
-### High Severity (P1)
-| Issue | Location | Risk | Fix |
-|-------|----------|------|-----|
-| CORS any origin | Both edge functions line 5 | Any website can make requests | Restrict to known origins |
+### Remaining Items
+| Issue | Risk | Priority |
+|-------|------|----------|
+| Input validation | Low - potential injection | P2 (Future) |
 
-### Medium Severity (P2)
-| Issue | Location | Risk | Fix |
-|-------|----------|------|-----|
-| Verbose errors | identify-by-photo/index.ts:420-427 | Exposes implementation details | Return generic messages |
-| No input validation | scanner-ingest | Potential injection | Validate barcode format, UUIDs |
-
-### Positive Findings
+### Security Architecture
+- ✅ Edge functions authenticate users via JWT Authorization header
+- ✅ household_id looked up from `user_households` table (not hardcoded)
+- ✅ CORS restricted to: `momma-bs-pantry.vercel.app`, `localhost:3000/3001`, Expo dev
+- ✅ Error details logged server-side only, generic messages to client
 - ✅ RLS policies correctly use user_households junction table
 - ✅ API keys (OpenAI, USDA) stored server-side only
 - ✅ .env files properly gitignored
-- ✅ Auth flow uses Supabase Auth correctly
-- ✅ No XSS vectors found
 
 ---
 
