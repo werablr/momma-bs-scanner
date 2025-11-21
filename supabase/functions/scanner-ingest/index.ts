@@ -493,7 +493,7 @@ serve(async (req) => {
         .insert({
           barcode: manualBarcode,
           storage_location_id: storage_location_id,
-          household_id: '7c093e13-4bcf-463e-96c1-9f499de9c4f2', // TODO: Get from user context
+          household_id: householdId, // SECURITY: Use authenticated user's household
           food_name: product_name,
           brand_name: brand_name || null,
           expiration_date: expiration_date,
