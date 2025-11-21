@@ -7,8 +7,8 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Complete data ingestion via barcode scanning + AI vision identification
-**Status:** ✅ **CLEAN** - Nutritionix eliminated, complete multi-source data capture operational
-**Last Updated:** November 20, 2025
+**Status:** 🔒 **SECURITY AUDIT COMPLETE** - Critical issues identified, fixes required before App Store
+**Last Updated:** November 21, 2025
 
 ---
 
@@ -26,6 +26,9 @@
 - ✅ **Storage Locations** - 8 locations loaded from database
 
 ### Active Issues
+- 🔴 **SECURITY: Hardcoded household_id** - Edge functions use hardcoded ID, bypassing RLS
+- 🔴 **SECURITY: Service role key** - Edge functions bypass all RLS policies
+- 🟠 **SECURITY: CORS allows any origin** - `Access-Control-Allow-Origin: *`
 - 🔜 **AI Vision UI incomplete** - Backend working, need product selection screen
 - ⚠️ **Metro auto-connect** - Requires manual URL entry (needs EAS rebuild for permissions)
 
@@ -265,27 +268,50 @@ supabase functions deploy identify-by-photo
 
 ## 🚀 NEXT STEPS (PRIORITY ORDER)
 
-### Immediate (Current Session)
-1. **🔥 Fix RLS Policy for AI Vision Database Insert**
+### 🔒 SECURITY FIXES (MUST DO BEFORE APP STORE)
+
+1. **🔴 P0: Fix hardcoded household_id in edge functions** (2-4 hours)
+   - **Location:** `scanner-ingest/index.ts:255, :431`
+   - **Problem:** `household_id: '7c093e13-4bcf-463e-96c1-9f499de9c4f2'` bypasses RLS
+   - **Fix:** Extract household_id from authenticated user's JWT or query user_households
+   - **Also fix:** `scannerAPI.js:342` default parameter
+
+2. **🔴 P0: Add authentication to Pantry app** (4-8 hours)
+   - **Problem:** Uses static HOUSEHOLD_ID from env, no auth check
+   - **Fix:** Add Supabase Auth flow matching Scanner's pattern
+
+3. **🟠 P1: Restrict CORS origins** (1 hour)
+   - **Location:** Both edge functions have `'Access-Control-Allow-Origin': '*'`
+   - **Fix:** Restrict to known origins (Vercel URL, Expo dev URL)
+
+4. **🟡 P2: Sanitize error responses** (1-2 hours)
+   - **Location:** `identify-by-photo/index.ts:420-427`
+   - **Problem:** Returns error.message, error.name, error_details to client
+   - **Fix:** Log full errors server-side, return generic messages
+
+5. **🟡 P2: Add input validation** (2-4 hours)
+   - **Problem:** No validation of barcode format, UUID format, etc.
+   - **Fix:** Validate inputs before processing
+
+### Functional Tasks (After Security)
+
+6. **🔥 Fix RLS Policy for AI Vision Database Insert**
    - **Status:** AI Vision working! Successfully identified "Bartlett Pear" with 95% confidence
    - **Issue:** Database INSERT fails with "permission denied for table users"
    - **Root Cause:** RLS policy references `auth.users.household_id` which doesn't exist
-   - **Current Action:** Running diagnostic SQL to identify existing policies vs what should exist
    - **Next:** Fix RLS policies to use `user_households` table instead of `auth.users`
-   - **File:** `/Users/macmini/Desktop/momma-bs-scanner/diagnose_rls_policies.sql`
 
-2. **Test pear scanning end-to-end** after RLS fix
-3. **Document issues** in [Kitchen/TESTING.md](../Momma B's Kitchen/TESTING.md)
+7. **Test pear scanning end-to-end** after RLS fix
+8. **Document issues** in [Kitchen/TESTING.md](../Momma B's Kitchen/TESTING.md)
 
 ### Short-Term (1-2 Weeks)
-4. **Package size confirmation UI** - "We found: 15 oz - Correct? [Edit]"
-5. **Health score badges** - Nutri-Score, NOVA, dietary icons in review screen
-6. **Deploy Pantry app to Vercel** - Enable full workflow testing
+9. **Package size confirmation UI** - "We found: 15 oz - Correct? [Edit]"
+10. **Health score badges** - Nutri-Score, NOVA, dietary icons in review screen
 
 ### Medium-Term (2-4 Weeks)
-7. **Polish UX** based on real-world testing
-8. **Optimize AI prompts** for better produce identification
-9. **Prepare App Store submission** when 50+ scans complete
+11. **Polish UX** based on real-world testing
+12. **Optimize AI prompts** for better produce identification
+13. **Prepare App Store submission** when security fixes + 50+ scans complete
 
 ---
 
@@ -373,6 +399,37 @@ supabase functions deploy identify-by-photo
   - 📋 Next: Expand schema with 80+ micronutrient columns (see API_FIELDS_AVAILABLE.md)
 
 **Critical Lesson:** Built Ad Hoc without discussing strategy first - always use TestFlight for long-term distribution
+
+---
+
+---
+
+## 🔒 SECURITY AUDIT FINDINGS (Nov 21, 2025)
+
+### Critical Issues (P0)
+| Issue | Location | Risk | Fix |
+|-------|----------|------|-----|
+| Hardcoded household_id | scanner-ingest/index.ts:255,:431 | Any auth user can write to hardcoded household | Extract from JWT/user_households |
+| Hardcoded household_id | scannerAPI.js:342 | Default bypasses proper auth | Remove default parameter |
+| Service role key | Both edge functions | Bypasses all RLS policies | Forward user JWT instead |
+
+### High Severity (P1)
+| Issue | Location | Risk | Fix |
+|-------|----------|------|-----|
+| CORS any origin | Both edge functions line 5 | Any website can make requests | Restrict to known origins |
+
+### Medium Severity (P2)
+| Issue | Location | Risk | Fix |
+|-------|----------|------|-----|
+| Verbose errors | identify-by-photo/index.ts:420-427 | Exposes implementation details | Return generic messages |
+| No input validation | scanner-ingest | Potential injection | Validate barcode format, UUIDs |
+
+### Positive Findings
+- ✅ RLS policies correctly use user_households junction table
+- ✅ API keys (OpenAI, USDA) stored server-side only
+- ✅ .env files properly gitignored
+- ✅ Auth flow uses Supabase Auth correctly
+- ✅ No XSS vectors found
 
 ---
 
