@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../lib/supabase';
 import scannerAPI from '../services/scannerAPI';
 
@@ -35,26 +36,31 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
       });
 
       console.log('Photo captured:', photo.path);
-      setLoadingMessage('☁️ Uploading to storage...');
+      setLoadingMessage('🔄 Preparing image...');
 
-      // Upload to Supabase Storage
-      const photoUrl = await uploadPhotoToStorage(photo.path);
-      console.log('Photo uploaded:', photoUrl);
+      // Resize image on device (1024px max, ~100-300KB)
+      const fileUri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
+      const resizedImage = await ImageManipulator.manipulateAsync(
+        fileUri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
 
+      console.log('Image resized, base64 length:', resizedImage.base64?.length);
       setLoadingMessage('🤖 AI is identifying...');
 
-      // Call edge function to identify
-      const result = await scannerAPI.identifyByPhoto(photoUrl);
+      // Send base64 directly to edge function (no storage upload)
+      const result = await scannerAPI.identifyByPhoto(resizedImage.base64);
       console.log('AI identification result:', result);
 
       if (result.success) {
-        // Pass results to parent (now includes both USDA and OFF matches)
+        // Pass results to parent (includes base64 for later storage upload)
         onPhotoIdentified({
           aiIdentification: result.ai_identification,
           matches: result.matches || [],
           usdaCount: result.usda_matches || 0,
           offCount: result.off_matches || 0,
-          photoUrl: photoUrl
+          photoBase64: resizedImage.base64  // Pass base64 for later storage
         });
       } else {
         throw new Error(result.error || 'Failed to identify item');

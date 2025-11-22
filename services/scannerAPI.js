@@ -340,13 +340,14 @@ class ScannerAPI {
 
   // AI Vision: Identify food by photo
   // Note: household_id is now extracted from JWT in edge function, not passed from client
-  async identifyByPhoto(photoUrl) {
+  // Now accepts base64 directly instead of URL for faster processing
+  async identifyByPhoto(photoBase64) {
     try {
-      console.log('🤖 Calling AI Vision API with photo:', photoUrl);
+      console.log('🤖 Calling AI Vision API with base64 image, length:', photoBase64?.length);
 
       const { data, error } = await supabase.functions.invoke('identify-by-photo', {
         body: {
-          photo_url: photoUrl
+          photo_base64: photoBase64
         }
       });
 

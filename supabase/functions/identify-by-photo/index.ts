@@ -37,33 +37,16 @@ async function dbLog(supabaseClient: any, level: string, message: string, data: 
 }
 
 // Call OpenAI GPT-4 Vision API to identify food item
-async function identifyFoodWithAI(imageUrl: string, openaiApiKey: string): Promise<{
+// Now accepts base64 directly from client for faster processing
+async function identifyFoodWithAI(base64Image: string, openaiApiKey: string): Promise<{
   name: string,
   confidence: number,
   category: string,
   reasoning: string
 }> {
-  // Fetch the image and convert to base64
-  console.log('Fetching image from:', imageUrl)
-  const imageResponse = await fetch(imageUrl)
-  if (!imageResponse.ok) {
-    throw new Error(`Failed to fetch image: ${imageResponse.status}`)
-  }
+  console.log('Processing base64 image, length:', base64Image.length)
 
-  const imageBuffer = await imageResponse.arrayBuffer()
-
-  // Convert to base64 in chunks to avoid stack overflow
-  const bytes = new Uint8Array(imageBuffer)
-  const chunkSize = 8192
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.slice(i, i + chunkSize)
-    binary += String.fromCharCode.apply(null, Array.from(chunk))
-  }
-  const base64Image = btoa(binary)
   const base64DataUrl = `data:image/jpeg;base64,${base64Image}`
-
-  console.log('Converted image to base64, size:', base64Image.length)
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -358,11 +341,11 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json()
-    const { photo_url, storage_location_id } = requestBody
+    const { photo_base64 } = requestBody
 
-    if (!photo_url) {
+    if (!photo_base64) {
       return new Response(
-        JSON.stringify({ success: false, error: 'photo_url is required' }),
+        JSON.stringify({ success: false, error: 'photo_base64 is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -390,7 +373,7 @@ serve(async (req) => {
       )
     }
 
-    await dbLog(supabaseClient, 'info', 'AI photo identification started', { photo_url, householdId })
+    await dbLog(supabaseClient, 'info', 'AI photo identification started', { base64_length: photo_base64.length, householdId })
 
     // Get OpenAI API key from environment
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
@@ -402,9 +385,9 @@ serve(async (req) => {
       )
     }
 
-    // Step 1: Identify food with AI
+    // Step 1: Identify food with AI (base64 sent directly from client)
     await dbLog(supabaseClient, 'debug', 'Calling OpenAI Vision API')
-    const aiResult = await identifyFoodWithAI(photo_url, openaiApiKey)
+    const aiResult = await identifyFoodWithAI(photo_base64, openaiApiKey)
     await dbLog(supabaseClient, 'info', 'AI identification complete', aiResult)
 
     console.log('AI identified:', aiResult.name, 'with confidence:', aiResult.confidence)
@@ -454,8 +437,7 @@ serve(async (req) => {
         matches: allMatches,
         usda_matches: usdaMatches.length,
         off_matches: offMatches.length,
-        total_matches: allMatches.length,
-        photo_url: photo_url
+        total_matches: allMatches.length
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
