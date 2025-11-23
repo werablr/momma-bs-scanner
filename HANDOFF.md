@@ -19,7 +19,7 @@
 - Edge function security (JWT auth, CORS restricted)
 
 ### Issues
-- AI Vision UI incomplete (backend works, need product selection screen)
+- **AI Vision "No Matches" Problem:** When USDA returns 0 matches, user clicks "Enter Manually" which saves item WITHOUT nutrition data. Root cause: `prepareUSDASearchTerm()` in `identify-by-photo/index.ts` strips variety names (fuji, granny smith, etc.) but search may still fail. Affected items have `data_sources=null` and all nutrition fields empty.
 - Metro auto-connect requires manual URL entry (192.168.0.211:8081)
 
 ---
@@ -84,3 +84,8 @@ supabase functions deploy identify-by-photo
 - Product not found: Normal for QR codes, non-UPC barcodes
 - OCR fails: Expected for embossed/stamped text
 - Manual entry needed: By design for items without barcodes
+
+**AI Vision Debug:**
+- Check `edge_function_logs` table for `identify-by-photo` logs
+- Items with missing nutrition: `SELECT * FROM inventory_items WHERE data_sources IS NULL AND barcode LIKE 'PHOTO-%'`
+- Working photo scans have `usda_*` fields populated from USDA search results

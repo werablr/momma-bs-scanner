@@ -164,9 +164,16 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
         <Text style={styles.instructionsText}>
           Position the item in the center
         </Text>
-        <Text style={styles.instructionsSubtext}>
-          Works best with good lighting
-        </Text>
+      </View>
+
+      {/* Centering Frame */}
+      <View style={styles.frameContainer}>
+        <View style={styles.frame}>
+          <View style={[styles.corner, styles.topLeft]} />
+          <View style={[styles.corner, styles.topRight]} />
+          <View style={[styles.corner, styles.bottomLeft]} />
+          <View style={[styles.corner, styles.bottomRight]} />
+        </View>
       </View>
 
       {/* Capture Button */}
@@ -216,7 +223,7 @@ const styles = StyleSheet.create({
   },
   instructionsContainer: {
     position: 'absolute',
-    top: 150,
+    top: 60,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -231,16 +238,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 10,
-  },
-  instructionsSubtext: {
-    color: '#fff',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-    borderRadius: 8,
   },
   bottomContainer: {
     position: 'absolute',
@@ -280,5 +277,53 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
     margin: 20,
+  },
+  frameContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  frame: {
+    width: 320,
+    height: 320,
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderColor: '#fff',
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 12,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: 12,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 12,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 12,
   },
 });
