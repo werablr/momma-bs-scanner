@@ -176,11 +176,6 @@ async function searchUSDAFoods(productName: string, usdaApiKey: string): Promise
 function prepareUSDASearchTerm(productName: string): string {
   let term = productName.toLowerCase()
 
-  // Remove variety names (Fuji, Bartlett, etc.) - USDA uses generic terms
-  const varieties = ['fuji', 'gala', 'granny smith', 'honeycrisp', 'bartlett', 'bosc', 'anjou']
-  varieties.forEach(variety => {
-    term = term.replace(variety, '').trim()
-  })
 
   // Add "raw" for produce items to prioritize fresh
   const produceItems = ['apple', 'pear', 'banana', 'orange', 'pepper', 'onion', 'tomato', 'carrot', 'broccoli']
