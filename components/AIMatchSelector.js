@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput, Alert } from 'react-native';
 
-export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel }) {
+export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel, onRetry }) {
   const { aiIdentification, matches, photoBase64 } = aiResult;
   // Convert base64 to data URL for display
   const photoDataUrl = photoBase64 ? `data:image/jpeg;base64,${photoBase64}` : null;
@@ -173,7 +173,13 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel })
           ))
         ) : (
           <View style={styles.noMatchesContainer}>
-            <Text style={styles.noMatchesText}>No matches found in Open Food Facts</Text>
+            <Text style={styles.noMatchesText}>No matches found in database</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={onRetry}
+            >
+              <Text style={styles.retryButtonText}>🔄 Retry Scan</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.manualEntryButton}
               onPress={handleManualEntry}
@@ -416,6 +422,18 @@ const styles = StyleSheet.create({
     color: '#999',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   manualEntryButton: {
     backgroundColor: '#FF9500',

@@ -877,6 +877,11 @@ export default function BarcodeScanner({ onProductScanned }) {
             aiResult={aiResult}
             onMatchSelected={handleAIMatchSelected}
             onCancel={handleCancelAIFlow}
+            onRetry={() => {
+              setShowAIMatchSelector(false);
+              setAiResult(null);
+              setShowPhotoCapture(true);
+            }}
           />
         )}
       </Modal>
