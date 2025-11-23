@@ -136,6 +136,47 @@ export default function BarcodeScanner({ onProductScanned }) {
   }, []);
 
 
+  // Helper: Upload base64 image to Supabase Storage
+  const uploadBase64ToStorage = async (base64Data) => {
+    try {
+      const timestamp = Date.now();
+      const filename = `${timestamp}.jpg`;
+      const filePath = `${HOUSEHOLD_ID}/${filename}`;
+
+      // Decode base64 to binary
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('user-food-photos')
+        .upload(filePath, byteArray.buffer, {
+          contentType: 'image/jpeg',
+          cacheControl: '3600',
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        throw error;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('user-food-photos')
+        .getPublicUrl(filePath);
+
+      console.log('✅ Photo uploaded to storage:', publicUrl);
+      return publicUrl;
+    } catch (error) {
+      console.error('❌ Failed to upload photo:', error);
+      throw error;
+    }
+  };
+
   const handleStorageLocationSelected = async (location) => {
     setShowLocationPicker(false);
     setSelectedStorage(location.id);
@@ -146,6 +187,13 @@ export default function BarcodeScanner({ onProductScanned }) {
       if (scannedData.type === 'photo') {
         console.log('📸 AI Vision item - creating DB record in step 1');
 
+        // Upload user photo to storage first (if we have base64)
+        let photoUserUploadedUrl = null;
+        if (productData.photoBase64) {
+          console.log('☁️ Uploading user photo to storage...');
+          photoUserUploadedUrl = await uploadBase64ToStorage(productData.photoBase64);
+        }
+
         // Step 1: Create inventory record with AI Vision data
         const { data, error } = await supabase
           .from('inventory_items')
@@ -155,10 +203,10 @@ export default function BarcodeScanner({ onProductScanned }) {
             storage_location_id: location.id,
             food_name: productData.name,
             brand_name: productData.brand_name || '',
-            // Photos
-            photo_thumb: productData.photo_thumb,
-            photo_highres: productData.photo_highres,
-            photo_user_uploaded: productData.photo_user_uploaded,
+            // Photos - use API images if available, otherwise user photo
+            photo_thumb: productData.photo_thumb || photoUserUploadedUrl,
+            photo_highres: productData.photo_highres || photoUserUploadedUrl,
+            photo_user_uploaded: photoUserUploadedUrl,
             // AI Vision metadata
             ai_identified_name: productData.ai_identified_name,
             ai_confidence: productData.ai_confidence,
@@ -486,13 +534,15 @@ export default function BarcodeScanner({ onProductScanned }) {
     const photoBarcode = `PHOTO-${Date.now()}`;
 
     // Set product data similar to barcode scan
+    // Note: photoBase64 comes from match (passed through from AIMatchSelector)
+    // We'll upload to storage when user confirms storage location
     const productDataFromAI = {
       name: match.product_name,
       brand_name: match.brands || '',
       barcode: photoBarcode,
-      photo_thumb: match.image_thumb_url || aiResult.photoUrl,
-      photo_highres: match.image_url || aiResult.photoUrl,
-      photo_user_uploaded: aiResult.photoUrl,
+      photo_thumb: match.image_thumb_url || null,  // API image or null (will use user photo)
+      photo_highres: match.image_url || null,      // API image or null (will use user photo)
+      photoBase64: match.photoBase64,              // Store base64 for later upload
       ai_identified_name: aiResult.aiIdentification.name,
       ai_confidence: aiResult.aiIdentification.confidence,
       data_source: match.source || 'off', // Track whether USDA or OFF

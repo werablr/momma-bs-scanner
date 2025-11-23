@@ -7,8 +7,8 @@
 **App:** Scanner (React Native - Mobile)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Complete data ingestion via barcode scanning + AI vision identification
-**Status:** ✅ **SECURITY AUDIT COMPLETE** - All fixes deployed to production
-**Last Updated:** November 21, 2025
+**Status:** ✅ **AI Vision Optimized** - New build required (b351b9e7)
+**Last Updated:** November 22, 2025
 
 ---
 
@@ -377,6 +377,14 @@ All security issues have been fixed and deployed:
   - ✅ Scanner App: Removed `nf_*` references from components
   - ✅ Philosophy: "Capture Everything, Show the Best" - Zero data loss, complete provenance
   - 📋 Next: Expand schema with 80+ micronutrient columns (see API_FIELDS_AVAILABLE.md)
+
+**AI Vision Optimization (Nov 22):** Optimized photo flow - resize on device, send base64 directly
+  - ✅ Added `expo-image-manipulator` for on-device resize (1024px, 70% quality)
+  - ✅ Changed edge function to accept base64 directly (no storage fetch)
+  - ✅ Fixed `AIMatchSelector.js` to use `photoBase64` with data URL for display
+  - ✅ Fixed `BarcodeScanner.js` to upload photo to storage only after user confirms
+  - ✅ EAS build completed with native module included
+  - 📋 Requires installing new dev build on device (build ID: b351b9e7)
 
 **Critical Lesson:** Built Ad Hoc without discussing strategy first - always use TestFlight for long-term distribution
 

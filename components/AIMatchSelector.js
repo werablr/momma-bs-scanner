@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput, Alert } from 'react-native';
 
 export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel }) {
-  const { aiIdentification, matches, photoUrl } = aiResult;
+  const { aiIdentification, matches, photoBase64 } = aiResult;
+  // Convert base64 to data URL for display
+  const photoDataUrl = photoBase64 ? `data:image/jpeg;base64,${photoBase64}` : null;
   const [editedName, setEditedName] = useState(aiIdentification.name);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -17,7 +19,7 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel })
           onPress: () => {
             onMatchSelected({
               ...match,
-              userPhotoUrl: photoUrl,
+              photoBase64: photoBase64,  // Pass base64 for storage upload later
               aiIdentifiedName: editedName,
               aiConfidence: aiIdentification.confidence
             });
@@ -32,7 +34,7 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel })
     onMatchSelected({
       isManualEntry: true,
       product_name: editedName,
-      userPhotoUrl: photoUrl,
+      photoBase64: photoBase64,  // Pass base64 for storage upload later
       aiIdentifiedName: editedName,
       aiConfidence: aiIdentification.confidence
     });
@@ -51,9 +53,9 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel })
 
       <ScrollView style={styles.content}>
         {/* User Photo */}
-        {photoUrl && (
+        {photoDataUrl && (
           <View style={styles.photoContainer}>
-            <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode="cover" />
+            <Image source={{ uri: photoDataUrl }} style={styles.photo} resizeMode="cover" />
           </View>
         )}
 
