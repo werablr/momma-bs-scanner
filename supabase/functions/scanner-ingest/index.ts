@@ -293,7 +293,7 @@ serve(async (req) => {
               },
               p_product_name: product.food_name,
               p_brand_name: product.brand_name,
-              p_nutritionix_data: null, // DEPRECATED
+              p_nutritionix_data: null,
               p_upcitemdb_data: upcitemdbData,
               p_openfoodfacts_data: openfoodfactsData,
               p_usda_data: null, // USDA enrichment now handled by Pantry app

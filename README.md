@@ -108,11 +108,11 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```json
 {
   "expo": {
-    "name": "Nutrition Scanner",
-    "slug": "nutrition-scanner",
-    "bundleIdentifier": "com.nutritionscanner.app",
+    "name": "Momma B's Scanner",
+    "slug": "momma-bs-scanner",
+    "bundleIdentifier": "com.mommabsscanner.app",
     "ios": {
-      "appleTeamId": "9VXGGDHF22"  // Your paid Apple Developer account
+      "appleTeamId": "9VXGGDHF22"
     }
   }
 }

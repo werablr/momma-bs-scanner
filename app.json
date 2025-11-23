@@ -1,10 +1,10 @@
 {
   "expo": {
     "name": "Momma B's Scanner",
-    "slug": "mommas-scanner",
+    "slug": "momma-bs-scanner",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "momma-b-scanner",
+    "scheme": "momma-bs-scanner",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "icon": "./assets/images/icon.png",
@@ -19,13 +19,13 @@
       "buildNumber": "1",
       "appleTeamId": "9VXGGDHF22",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera to scan product barcodes and expiration dates for kitchen inventory management.",
+        "NSCameraUsageDescription": "Scanner needs camera access for barcode and expiration date scanning",
         "NSPhotoLibraryUsageDescription": "This app may access your photo library to scan barcodes from images.",
         "NSLocalNetworkUsageDescription": "This app requires local network access to connect to the development server for live updates during development.",
         "NSLocationWhenInUseUsageDescription": "This app does not access your location. This permission is required by a third-party library.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app does not access your location. This permission is required by a third-party library.",
         "NSBonjourServices": [
-          "_expodev._tcp"
+          "_expo-development-server._tcp"
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -69,7 +69,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "3c40b3e9-0142-4e8f-bfc6-e0906a39e52e"
+        "projectId": "9cc1c474-3265-4a96-9bba-a6ceb17e0e4a"
       },
       "router": {}
     },
