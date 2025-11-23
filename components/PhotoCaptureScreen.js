@@ -42,8 +42,8 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
       const fileUri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
       const resizedImage = await ImageManipulator.manipulateAsync(
         fileUri,
-        [{ resize: { width: 1024 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        [{ resize: { width: 512 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
 
       console.log('Image resized, base64 length:', resizedImage.base64?.length);

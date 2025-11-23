@@ -55,7 +55,7 @@ async function identifyFoodWithAI(base64Image: string, openaiApiKey: string): Pr
       'Authorization': `Bearer ${openaiApiKey}`
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: 'gpt-5.1',
       messages: [
         {
           role: 'system',
@@ -84,7 +84,7 @@ Be specific but practical. For produce, include variety if visible (Fuji apple v
           ]
         }
       ],
-      max_tokens: 300
+      max_completion_tokens: 300
     })
   })
 
@@ -392,39 +392,19 @@ serve(async (req) => {
 
     console.log('AI identified:', aiResult.name, 'with confidence:', aiResult.confidence)
 
-    // Step 2: Search both USDA and Open Food Facts in parallel
+    // Search USDA for nutrition data based on AI identification
     const usdaApiKey = Deno.env.get('USDA_API_KEY')
 
-    await dbLog(supabaseClient, 'debug', 'Searching USDA and OFF in parallel', { search_term: aiResult.name })
-
-    const [usdaMatches, offMatches] = await Promise.all([
-      usdaApiKey
-        ? searchUSDAFoods(aiResult.name, usdaApiKey).catch(err => {
-            console.error('USDA search failed:', err)
-            return []
-          })
-        : Promise.resolve([]),
-      searchOpenFoodFacts(aiResult.name).catch(err => {
-        console.error('OFF search failed:', err)
+    let usdaMatches: any[] = []
+    if (usdaApiKey) {
+      usdaMatches = await searchUSDAFoods(aiResult.name, usdaApiKey).catch(err => {
+        console.error('USDA search failed:', err)
         return []
       })
-    ])
+    }
 
-    await dbLog(supabaseClient, 'info', 'Search results', {
-      usda_matches: usdaMatches.length,
-      off_matches: offMatches.length
-    })
+    console.log('Found', usdaMatches.length, 'USDA matches')
 
-    console.log('Found', usdaMatches.length, 'USDA matches and', offMatches.length, 'OFF matches')
-
-    // Combine and sort matches by source and score
-    // USDA first (fresh produce), then OFF (packaged items)
-    const allMatches = [
-      ...usdaMatches.map((m: any) => ({ ...m, source: 'usda' })),
-      ...offMatches.map((m: any) => ({ ...m, source: 'off' }))
-    ]
-
-    // Return results
     return new Response(
       JSON.stringify({
         success: true,
@@ -434,10 +414,10 @@ serve(async (req) => {
           category: aiResult.category,
           reasoning: aiResult.reasoning
         },
-        matches: allMatches,
+        matches: usdaMatches,
         usda_matches: usdaMatches.length,
-        off_matches: offMatches.length,
-        total_matches: allMatches.length
+        off_matches: 0,
+        total_matches: usdaMatches.length
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
