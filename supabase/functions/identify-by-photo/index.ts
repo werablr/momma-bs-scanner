@@ -143,18 +143,17 @@ async function searchUSDAFoods(productName: string, usdaApiKey: string): Promise
     return []
   }
 
-  // Filter for fresh/raw foods and map to consistent format
+  // Filter out processed foods (Foundation and SR Legacy already contain mostly raw produce)
   return data.foods
     .filter((food: any) => {
       const desc = (food.description || '').toLowerCase()
-      // Prefer raw/fresh items, exclude canned/frozen/dried
-      return desc.includes('raw') ||
-             (!desc.includes('canned') &&
-              !desc.includes('frozen') &&
-              !desc.includes('dried') &&
-              !desc.includes('cooked'))
+      // Exclude obviously processed items
+      return !desc.includes('canned') &&
+             !desc.includes('frozen') &&
+             !desc.includes('dried') &&
+             !desc.includes('cooked')
     })
-    .slice(0, 5)  // Top 5 fresh matches
+    .slice(0, 5)  // Top 5 matches
     .map((food: any) => ({
       source: 'usda',
       fdc_id: food.fdcId,
@@ -164,9 +163,12 @@ async function searchUSDAFoods(productName: string, usdaApiKey: string): Promise
       image_thumb_url: null,
       // Extract nutrition from foodNutrients array
       nutrition: extractUSDANutrition(food.foodNutrients || []),
-      // USDA-specific fields
+      // USDA-specific fields for data provenance
       data_type: food.dataType,
       scientific_name: food.scientificName || null,
+      ndb_number: food.ndbNumber || null,        // Legacy NDB number (SR Legacy)
+      food_code: food.foodCode || null,          // Food code (Survey/FNDDS)
+      gtin_upc: food.gtinUpc || null,            // GTIN/UPC (Branded foods)
       match_score: calculateMatchScore(searchTerm, food.description, '')
     }))
     .sort((a: any, b: any) => b.match_score - a.match_score)
@@ -190,18 +192,39 @@ function prepareUSDASearchTerm(productName: string): string {
 function extractUSDANutrition(nutrients: any[]): any {
   const nutrition: any = {}
 
-  // Map USDA nutrient IDs to our field names
+  // Map USDA nutrient IDs to our field names (capture everything available)
   const nutrientMap: { [key: number]: string } = {
     1008: 'energy_kcal',      // Energy (kcal)
     1003: 'proteins',         // Protein
     1004: 'fat',              // Total lipid (fat)
+    1258: 'saturated_fat',    // Fatty acids, total saturated
+    1257: 'trans_fat',        // Fatty acids, total trans
     1005: 'carbohydrates',    // Carbohydrate
     1079: 'fiber',            // Fiber, total dietary
     2000: 'sugars',           // Sugars, total
+    1235: 'added_sugars',     // Sugars, added
     1093: 'sodium',           // Sodium
+    1253: 'cholesterol',      // Cholesterol
     1087: 'calcium',          // Calcium
     1089: 'iron',             // Iron
     1092: 'potassium',        // Potassium
+    1114: 'vitamin_d',        // Vitamin D (D2 + D3)
+    1106: 'vitamin_a',        // Vitamin A, RAE
+    1162: 'vitamin_c',        // Vitamin C, total ascorbic acid
+    1109: 'vitamin_e',        // Vitamin E (alpha-tocopherol)
+    1185: 'vitamin_k',        // Vitamin K (phylloquinone)
+    1165: 'thiamin',          // Thiamin
+    1166: 'riboflavin',       // Riboflavin
+    1167: 'niacin',           // Niacin
+    1175: 'vitamin_b6',       // Vitamin B-6
+    1177: 'folate',           // Folate, total
+    1178: 'vitamin_b12',      // Vitamin B-12
+    1091: 'phosphorus',       // Phosphorus
+    1090: 'magnesium',        // Magnesium
+    1095: 'zinc',             // Zinc
+    1103: 'selenium',         // Selenium
+    1098: 'copper',           // Copper
+    1101: 'manganese',        // Manganese
   }
 
   nutrients.forEach((nutrient: any) => {

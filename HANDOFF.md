@@ -11,6 +11,7 @@
 ### Working
 - Authentication & RLS (secure login, household-based isolation)
 - Barcode scanning (UPC/EAN via camera)
+- PLU code entry (manual entry for produce stickers)
 - AI Vision (OpenAI GPT-4o identifying produce)
 - Multi-API integration (Open Food Facts + UPCitemdb + USDA)
 - Photo uploads (Supabase Storage)
@@ -32,14 +33,21 @@
 3. OCR expiration date (or manual entry)
 4. Review screen → save to database
 
-### 2. AI Vision (Produce/Bulk)
+### 2. PLU Code Entry (Produce Stickers)
+1. "Enter PLU Code" → user enters 4-5 digit code from produce sticker
+2. Edge function (`lookup-plu`) maps PLU to USDA search term (e.g., 4011 → "banana raw")
+3. USDA FoodData Central returns nutrition matches
+4. User selects match → storage location + expiration
+5. Generates `PLU-{code}` barcode
+
+### 3. AI Vision (Produce/Bulk)
 1. "Scan by Photo" → camera captures image
 2. OpenAI GPT-4 Vision identifies item
 3. USDA + Open Food Facts searched in parallel
 4. User selects match → storage location + expiration
 5. Generates `PHOTO-{timestamp}` barcode
 
-### 3. Manual Entry
+### 4. Manual Entry
 - User types product name, brand, details
 - Generates `MANUAL-{timestamp}` barcode
 
@@ -63,6 +71,7 @@ Never use `npx expo run:ios` - CocoaPods fails
 ```bash
 supabase functions deploy scanner-ingest
 supabase functions deploy identify-by-photo
+supabase functions deploy lookup-plu
 ```
 
 ---

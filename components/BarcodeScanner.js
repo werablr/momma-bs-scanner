@@ -12,6 +12,7 @@ import OCRTestingScreen from './OCRTestingScreen';
 import { WorkflowValidator } from './WorkflowValidator';
 import PhotoCaptureScreen from './PhotoCaptureScreen';
 import AIMatchSelector from './AIMatchSelector';
+import PLUEntryForm from './PLUEntryForm';
 
 export default function BarcodeScanner({ onProductScanned }) {
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,7 @@ export default function BarcodeScanner({ onProductScanned }) {
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [showAIMatchSelector, setShowAIMatchSelector] = useState(false);
   const [aiResult, setAiResult] = useState(null);
+  const [showPLUEntry, setShowPLUEntry] = useState(false);
   const isProcessing = useRef(false);
   const scanCooldown = useRef(false);
 
@@ -221,7 +223,17 @@ export default function BarcodeScanner({ onProductScanned }) {
             usda_calcium: productData.usda_calcium || productData.calcium,
             usda_iron: productData.usda_iron || productData.iron,
             usda_potassium: productData.usda_potassium || productData.potassium,
+            usda_saturated_fat: productData.usda_saturated_fat,
+            usda_trans_fat: productData.usda_trans_fat,
+            usda_cholesterol: productData.usda_cholesterol,
+            usda_added_sugars: productData.usda_added_sugars,
+            usda_vitamin_d: productData.usda_vitamin_d,
             usda_fdc_id: productData.usda_fdc_id || productData.fdc_id,
+            usda_raw_data: productData.usda_raw_data,
+            // USDA provenance IDs
+            ndb_number: productData.ndb_number,
+            food_code: productData.food_code,
+            gtin_upc: productData.gtin_upc,
             // OFF-specific fields (if OFF source)
             off_calories: productData.off_calories,
             off_protein: productData.off_protein,
@@ -234,6 +246,8 @@ export default function BarcodeScanner({ onProductScanned }) {
             nova_group: productData.nova_group,
             is_vegan: productData.is_vegan,
             is_vegetarian: productData.is_vegetarian,
+            // Quantity (for produce)
+            quantity: productData.quantity || 1,
             // Status
             status: 'pending',
             volume_remaining: 100
@@ -545,22 +559,34 @@ export default function BarcodeScanner({ onProductScanned }) {
       photoBase64: match.photoBase64,              // Store base64 for later upload
       ai_identified_name: aiResult.aiIdentification.name,
       ai_confidence: aiResult.aiIdentification.confidence,
+      quantity: match.quantity || 1,               // Quantity from picker (produce)
       data_source: match.source || 'off', // Track whether USDA or OFF
 
       // Map nutrition data based on source
       ...(match.source === 'usda' ? {
-        // USDA nutrition → usda_* fields (source-specific)
+        // USDA nutrition → usda_* fields (capture all available nutrients per data philosophy)
         usda_calories: match.nutrition?.energy_kcal || null,
         usda_protein: match.nutrition?.proteins || null,
         usda_total_carbohydrate: match.nutrition?.carbohydrates || null,
         usda_total_fat: match.nutrition?.fat || null,
+        usda_saturated_fat: match.nutrition?.saturated_fat || null,
+        usda_trans_fat: match.nutrition?.trans_fat || null,
+        usda_cholesterol: match.nutrition?.cholesterol || null,
         usda_dietary_fiber: match.nutrition?.fiber || null,
         usda_sugars: match.nutrition?.sugars || null,
+        usda_added_sugars: match.nutrition?.added_sugars || null,
         usda_sodium: match.nutrition?.sodium || null,
         usda_calcium: match.nutrition?.calcium || null,
         usda_iron: match.nutrition?.iron || null,
         usda_potassium: match.nutrition?.potassium || null,
+        usda_vitamin_d: match.nutrition?.vitamin_d || null,
         usda_fdc_id: match.fdc_id || null,
+        // USDA provenance IDs for data traceability
+        ndb_number: match.ndb_number || null,
+        food_code: match.food_code || null,
+        gtin_upc: match.gtin_upc || null,
+        // Store complete nutrition in raw_data for analysis (vitamins, minerals, etc.)
+        usda_raw_data: match.nutrition || null,
         // Also populate nf_* as fallback display (SSoT)
         calories: match.nutrition?.energy_kcal || null,
         protein: match.nutrition?.proteins || null,
@@ -610,6 +636,67 @@ export default function BarcodeScanner({ onProductScanned }) {
     setShowPhotoCapture(false);
     setShowAIMatchSelector(false);
     setAiResult(null);
+  };
+
+  const handlePLUSubmit = async (pluCode) => {
+    setShowPLUEntry(false);
+    setLoading(true);
+
+    try {
+      console.log('🔢 Looking up PLU code:', pluCode);
+
+      // Call PLU lookup edge function
+      const { data, error } = await supabase.functions.invoke('lookup-plu', {
+        body: { pluCode }
+      });
+
+      if (error) {
+        console.error('❌ PLU lookup error:', error);
+        throw error;
+      }
+
+      console.log('✅ PLU lookup result:', data);
+
+      if (!data.success || !data.matches || data.matches.length === 0) {
+        Alert.alert(
+          'No Matches Found',
+          `PLU code ${pluCode} not found in USDA database. Try manual entry instead.`,
+          [
+            { text: 'Manual Entry', onPress: () => setShowManualEntry(true) },
+            { text: 'Try Again', onPress: () => setShowPLUEntry(true) },
+            { text: 'Cancel' }
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Show matches in AI Match Selector (reuse existing component)
+      const aiResultFromPLU = {
+        aiIdentification: {
+          name: `PLU ${pluCode}`,
+          confidence: 0.95,
+          category: 'produce',
+          reasoning: `Looked up by PLU code ${pluCode}`
+        },
+        matches: data.matches,
+        usdaCount: data.matches.length,
+        offCount: 0,
+        photoBase64: null  // No photo for PLU lookups
+      };
+
+      setAiResult(aiResultFromPLU);
+      setShowAIMatchSelector(true);
+
+    } catch (error) {
+      console.error('❌ PLU lookup error:', error);
+      Alert.alert('Error', 'Failed to lookup PLU code. Please try again.', [
+        { text: 'Retry', onPress: () => setShowPLUEntry(true) },
+        { text: 'Cancel' }
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateStorageLocationNames = async () => {
@@ -697,6 +784,18 @@ export default function BarcodeScanner({ onProductScanned }) {
               </View>
             </TouchableOpacity>
 
+            {/* PLU Entry Button */}
+            <TouchableOpacity
+              style={[styles.startScanButton, styles.pluEntryButton]}
+              onPress={() => setShowPLUEntry(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.startScanButtonText}>🔢 Enter PLU Code</Text>
+                <Text style={styles.photoButtonSubtext}>For produce stickers</Text>
+              </View>
+            </TouchableOpacity>
+
             {/* Manual Entry Button */}
             <TouchableOpacity
               style={[styles.startScanButton, styles.manualEntryButton]}
@@ -707,37 +806,13 @@ export default function BarcodeScanner({ onProductScanned }) {
                 <Text style={styles.startScanButtonText}>✏️ Manual Entry</Text>
               </View>
             </TouchableOpacity>
-            
-            {/* Test API Connection Button */}
-            <TouchableOpacity
-              style={{ marginTop: 20, padding: 15, backgroundColor: '#007AFF', borderRadius: 10 }}
-              onPress={testScannerAPI}
-            >
-              <Text style={{ color: 'white', fontWeight: 'bold' }}>🧪 Test API Connection</Text>
-            </TouchableOpacity>
-            
+
             {/* Update Storage Locations Button */}
             <TouchableOpacity
               style={{ marginTop: 10, padding: 15, backgroundColor: '#FF9500', borderRadius: 10 }}
               onPress={updateStorageLocationNames}
             >
               <Text style={{ color: 'white', fontWeight: 'bold' }}>🏷️ Update Location Names</Text>
-            </TouchableOpacity>
-            
-            {/* OCR Testing Button */}
-            <TouchableOpacity
-              style={{ marginTop: 10, padding: 15, backgroundColor: '#8E44AD', borderRadius: 10 }}
-              onPress={() => setShowOCRTesting(true)}
-            >
-              <Text style={{ color: 'white', fontWeight: 'bold' }}>🔬 OCR Testing Suite</Text>
-            </TouchableOpacity>
-            
-            {/* Workflow Validator Button */}
-            <TouchableOpacity
-              style={{ marginTop: 10, padding: 15, backgroundColor: '#4CAF50', borderRadius: 10 }}
-              onPress={() => setShowWorkflowValidator(true)}
-            >
-              <Text style={{ color: 'white', fontWeight: 'bold' }}>🧪 Validate Workflow</Text>
             </TouchableOpacity>
             
             {/* Debug info - remove this later */}
@@ -885,6 +960,12 @@ export default function BarcodeScanner({ onProductScanned }) {
           />
         )}
       </Modal>
+
+      <PLUEntryForm
+        visible={showPLUEntry}
+        onClose={() => setShowPLUEntry(false)}
+        onSubmit={handlePLUSubmit}
+      />
     </View>
   );
 }
@@ -975,6 +1056,10 @@ const styles = StyleSheet.create({
   },
   photoScanButton: {
     backgroundColor: '#34C759',
+    marginTop: 15,
+  },
+  pluEntryButton: {
+    backgroundColor: '#FF9500',
     marginTop: 15,
   },
   manualEntryButton: {

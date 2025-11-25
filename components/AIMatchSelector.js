@@ -7,11 +7,12 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel, o
   const photoDataUrl = photoBase64 ? `data:image/jpeg;base64,${photoBase64}` : null;
   const [editedName, setEditedName] = useState(aiIdentification.name);
   const [isEditing, setIsEditing] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   const handleSelectMatch = (match) => {
     Alert.alert(
       'Confirm Selection',
-      `Use "${match.product_name}"${match.brands ? ` by ${match.brands}` : ''}?`,
+      `Use "${match.product_name}"${match.brands ? ` by ${match.brands}` : ''}?\n\nQuantity: ${quantity}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -21,7 +22,8 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel, o
               ...match,
               photoBase64: photoBase64,  // Pass base64 for storage upload later
               aiIdentifiedName: editedName,
-              aiConfidence: aiIdentification.confidence
+              aiConfidence: aiIdentification.confidence,
+              quantity: quantity
             });
           }
         }
@@ -36,7 +38,8 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel, o
       product_name: editedName,
       photoBase64: photoBase64,  // Pass base64 for storage upload later
       aiIdentifiedName: editedName,
-      aiConfidence: aiIdentification.confidence
+      aiConfidence: aiIdentification.confidence,
+      quantity: quantity
     });
   };
 
@@ -97,6 +100,27 @@ export default function AIMatchSelector({ aiResult, onMatchSelected, onCancel, o
           {aiIdentification.reasoning && (
             <Text style={styles.reasoning}>{aiIdentification.reasoning}</Text>
           )}
+        </View>
+
+        {/* Quantity Picker */}
+        <View style={styles.quantitySection}>
+          <Text style={styles.quantityLabel}>Quantity:</Text>
+          <View style={styles.quantityControls}>
+            <TouchableOpacity
+              style={[styles.quantityButton, quantity <= 1 && styles.quantityButtonDisabled]}
+              onPress={() => setQuantity(Math.max(1, quantity - 1))}
+              disabled={quantity <= 1}
+            >
+              <Text style={styles.quantityButtonText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.quantityValue}>{quantity}</Text>
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => setQuantity(quantity + 1)}
+            >
+              <Text style={styles.quantityButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Matches */}
@@ -299,6 +323,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     fontStyle: 'italic',
+  },
+  quantitySection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  quantityLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quantityButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  quantityButtonText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  quantityValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    minWidth: 50,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 16,
