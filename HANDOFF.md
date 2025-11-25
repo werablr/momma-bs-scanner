@@ -21,6 +21,7 @@
 
 ### Issues
 - **AI Vision "No Matches" Problem:** When USDA returns 0 matches, user clicks "Enter Manually" which saves item WITHOUT nutrition data. Root cause: `prepareUSDASearchTerm()` in `identify-by-photo/index.ts` strips variety names (fuji, granny smith, etc.) but search may still fail. Affected items have `data_sources=null` and all nutrition fields empty.
+- **PLU Code Maintenance:** The `lookup-plu` edge function contains a hardcoded mapping of ~50 PLU codes to USDA search terms. This requires manual maintenance when adding new produce items. Long-term solution: Import complete IFPS PLU database into Supabase table or remove feature in favor of AI Vision.
 - Metro auto-connect requires manual URL entry (192.168.0.211:8081)
 
 ---
@@ -36,6 +37,8 @@
 ### 2. PLU Code Entry (Produce Stickers)
 1. "Enter PLU Code" → user enters 4-5 digit code from produce sticker
 2. Edge function (`lookup-plu`) maps PLU to USDA search term (e.g., 4011 → "banana raw")
+   - **Note:** Hardcoded mapping for ~50 common items only. Not scalable long-term.
+   - **Limitation:** PLU codes are IFPS industry standards, not in USDA database
 3. USDA FoodData Central returns nutrition matches
 4. User selects match → storage location + expiration
 5. Generates `PLU-{code}` barcode
