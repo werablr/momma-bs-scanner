@@ -3,12 +3,13 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
+**Last Updated:** November 28, 2025 (Architecture Audit Verified)
 
 ---
 
 ## Current State
 
-### Working
+### Working ✅
 - Authentication & RLS (secure login, household-based isolation)
 - Barcode scanning (UPC/EAN via camera)
 - PLU code entry (manual entry for produce stickers)
@@ -19,74 +20,100 @@
 - OCR + manual date picker for expiration
 - Edge function security (JWT auth, CORS restricted)
 
-### Known Issues
+### Architecture Grade: **B** (Verified Nov 28, 2025)
+**Strengths:** Feature-complete, secure, functional
+**Weaknesses:** Monolithic component (1,294 lines), no observability, sequential API calls
 
-#### 🔴 CRITICAL (Data Loss / Breaking Functionality)
-1. **Orphaned Photo Storage** - `BarcodeScanner.js:192-270`
-   - **Problem:** Photo uploads to Supabase Storage succeed, but if DB insert fails (invalid storage_location_id, RLS violation), file is orphaned forever
-   - **Impact:** Storage bloat, potential data loss, no cleanup mechanism
-   - **Fix:** Add transaction rollback or cleanup on DB insert failure
+### 🚨 **CRITICAL WARNING: DO NOT FIX BUGS IN BarcodeScanner.js**
 
-2. **No Idempotency Keys** - All edge functions
-   - **Problem:** Network retries create duplicate inventory items; no deduplication protection
-   - **Impact:** Users see duplicate items after network hiccups or double-clicks
-   - **Fix:** Add UUID-based idempotency key tracking
+**Problem:** 1,294 lines with 21 useState hooks = invisible state coupling
+- **2^21 = 2,097,152 possible state combinations**
+- Only a handful are valid
+- Every change breaks something else (hidden dependencies)
+- **This is not fixable by being more careful** - the architecture makes correctness impossible
 
-3. **Items Stuck in 'pending' Status** - `scanner-ingest:407`
+**Solution:** Stabilize WITHOUT touching BarcodeScanner.js, then rewrite with XState
+
+**Allowed Changes:**
+- ✅ Database migrations (cleanup jobs)
+- ✅ Edge function improvements (parallel APIs, idempotency)
+- ✅ Wrapper components (error boundary around BarcodeScanner)
+- ❌ Any changes to BarcodeScanner.js logic or state
+
+---
+
+## Verified Issues (Nov 28, 2025)
+
+### 🔴 **P0 - Critical (Fix This Week)**
+
+1. **Items Stuck in 'pending' Status** - `scanner-ingest:407`
    - **Problem:** Step 1 creates item with `status='pending'`, if Step 2 fails (network timeout, session expire), item stuck forever
+   - **Verified:** Partial index exists (`idx_inventory_pending_created`), cleanup job missing
    - **Impact:** Database corruption, inventory count bloat
-   - **Fix:** Add cron job to cleanup/expire stuck pending items (>24hrs old)
+   - **Fix:** Add pg_cron job to cleanup items >24hrs old
+   - **Effort:** Low (30 minutes)
 
-#### 🟡 HIGH (Performance / UX Degradation)
-4. **AI Vision "No Matches" Problem** - `identify-by-photo:178-189`
-   - **Problem:** `prepareUSDASearchTerm()` strips variety names (Fuji, Granny Smith) but USDA search still fails → user forced to manual entry → item saved WITHOUT nutrition data (`data_sources=null`)
-   - **Impact:** Users get "No Matches" even for valid produce, data quality degraded
-   - **Fix:** Try variety-specific search first, fall back to generic, prevent saving without nutrition
+2. **Orphaned Photo Storage** - `BarcodeScanner.js:192-270`
+   - **Problem:** Photo uploads to Supabase Storage succeed, but if DB insert fails (invalid storage_location_id, RLS violation), file is orphaned forever
+   - **Verified:** No cleanup mechanism exists
+   - **Impact:** Storage bloat, costs grow unbounded
+   - **Fix:** Database-first insert OR cleanup function
+   - **Effort:** Medium (1-2 hours)
 
-5. **Sequential API Calls** - `scanner-ingest:115-259`
-   - **Problem:** UPCitemdb → OFF called sequentially, should use `Promise.all()`
-   - **Impact:** +1-3 seconds per barcode on slow APIs
-   - **Fix:** Parallelize API calls for barcode workflow
+### 🟡 **P1 - High Priority (Next Week - EDGE FUNCTIONS ONLY, NOT BarcodeScanner.js)**
 
-6. **Photo Upload Blocks DB Insert** - `BarcodeScanner.js:196-200`
-   - **Problem:** Large photo uploads block entire workflow; serial execution
-   - **Impact:** Slow UX, not graceful degradation on upload failures
-   - **Fix:** Parallelize upload + DB insert, degrade gracefully on photo failure
+3. **Sequential API Calls** - `scanner-ingest:164-258`
+   - **Problem:** UPCitemdb → OFF called sequentially, should use `Promise.allSettled()`
+   - **Verified:** Lines 164-258, sequential fetch calls
+   - **Impact:** +2-3 seconds per barcode scan
+   - **Fix:** Parallelize API calls IN EDGE FUNCTION
+   - **Effort:** Low (1 hour)
+   - **Risk:** LOW (edge function only, no UI state changes)
 
-#### 🟢 MEDIUM (Code Quality / Maintainability)
-7. **PLU Database Incomplete** - `lookup-plu:10-28`
-   - **Problem:** Hardcoded ~50 PLU codes, IFPS has 1000+, requires code deployment for new produce
-   - **Impact:** Missing PLU codes force manual entry or AI Vision fallback
-   - **Fix:** Import IFPS database into Supabase table or remove feature
+4. **Hardcoded Household ID** - `BarcodeScanner.js:42` - ⚠️ **DEFERRED**
+   - **Problem:** `const HOUSEHOLD_ID = '7c093e13-4bcf-463e-96c1-9f499de9c4f2';`
+   - **Verified:** Line 42, hardcoded UUID
+   - **Impact:** Blocks adding 2nd household
+   - **Fix:** Use auth context for household_id
+   - **Effort:** Low (30 minutes)
+   - **Risk:** HIGH (requires touching BarcodeScanner.js state)
+   - **Decision:** DEFER until after state machine rewrite
 
-8. **20+ useState in Monolithic Component** - `BarcodeScanner.js:18-37`
-   - **Problem:** 1,294-line component with 20 separate state hooks, no centralized state machine
+### 🟢 **P2 - Medium Priority (This Month)**
+
+5. **No Idempotency Keys** - All edge functions
+   - **Problem:** Network retries create duplicate inventory items; no deduplication protection
+   - **Impact (Current Scale):** Low (rare with 2 users)
+   - **Fix:** Add UUID-based idempotency key tracking
+   - **Effort:** Medium (2-3 hours)
+
+6. **AI Vision "No Matches" Problem** - `identify-by-photo:178-189`
+   - **Problem:** `prepareUSDASearchTerm()` strips variety names (Fuji, Granny Smith) but USDA search still fails → item saved WITHOUT nutrition data
+   - **Impact:** Users get "No Matches" even for valid produce
+   - **Fix:** Try variety-specific search first, fall back to generic
+   - **Effort:** Low (1 hour)
+
+### 🔵 **P3-P5 - Defer (Code Quality, Not Blocking)**
+
+7. **Monolithic Component** - `BarcodeScanner.js` (1,294 lines, 21 useState hooks)
+   - **Verified:** Exactly 1,294 lines, 21 useState hooks found
    - **Impact:** Hard to debug, state consistency issues, unmaintainable
-   - **Fix:** Refactor to XState or reduce-based state machine
+   - **Fix:** Refactor to XState or reducer-based state machine
+   - **Effort:** High (1-2 weeks)
+   - **Priority:** P4 (defer until stable)
 
-9. **Missing TypeScript in Frontend** - All components
-   - **Problem:** No type safety for API responses, props, state
+8. **Missing TypeScript** - All components
    - **Impact:** Higher risk of runtime errors, harder to refactor
    - **Fix:** Gradual migration to TypeScript
+   - **Effort:** High (2-3 weeks)
+   - **Priority:** P4 (defer)
 
-10. **Silent API Failures** - `identify-by-photo:416-422`
-    - **Problem:** USDA/OFF failures return empty arrays without user notification
-    - **Impact:** No error visibility, users confused by "No matches"
-    - **Fix:** Surface error messages to user with retry options
-
-11. **OCR Blocks Main Thread** - `ocrService.js:20`
-    - **Problem:** ML Kit text recognition blocks UI for 1-2 seconds
-    - **Impact:** UI frozen during OCR processing
-    - **Fix:** Offload to web worker or background processing
-
-12. **No Request Deduplication** - Multiple locations
-    - **Problem:** Rapid duplicate scans/clicks make duplicate API calls
-    - **Impact:** Unnecessary API usage, UPCitemdb rate limit exhaustion
-    - **Fix:** Add request cache layer with short TTL
-
-13. **Metro Auto-Connect** - Development friction
-    - **Problem:** Requires manual URL entry (192.168.0.211:8081)
-    - **Fix:** Rebuild with EAS or investigate Expo config
+9. **PLU Database Incomplete** - `lookup-plu:10-28`
+   - **Problem:** Hardcoded ~50 PLU codes, IFPS has 1000+
+   - **Impact:** Missing PLU codes force manual entry
+   - **Fix:** Import IFPS database into Supabase table
+   - **Effort:** Medium (3-4 hours)
+   - **Priority:** P5 (nice to have)
 
 ---
 
@@ -94,14 +121,14 @@
 
 ### 1. Barcode (Packaged Goods)
 1. Scan barcode → select storage location
-2. Edge function queries: Product Catalog (cache) → Open Food Facts → UPCitemdb
+2. Edge function queries: Product Catalog (cache) → **UPCitemdb + OFF in parallel** (P1 fix needed)
 3. OCR expiration date (or manual entry)
 4. Review screen → save to database
 
 ### 2. PLU Code Entry (Produce Stickers)
 1. "Enter PLU Code" → user enters 4-5 digit code from produce sticker
 2. Edge function (`lookup-plu`) maps PLU to USDA search term (e.g., 4011 → "banana raw")
-   - **Note:** Hardcoded mapping for ~50 common items only. Not scalable long-term.
+   - **Note:** Hardcoded mapping for ~50 common items only
    - **Limitation:** PLU codes are IFPS industry standards, not in USDA database
 3. USDA FoodData Central returns nutrition matches
 4. User selects match → storage location + expiration
@@ -110,7 +137,7 @@
 ### 3. AI Vision (Produce/Bulk)
 1. "Scan by Photo" → camera captures image
 2. OpenAI GPT-4 Vision identifies item
-3. USDA + Open Food Facts searched in parallel
+3. USDA + Open Food Facts searched **sequentially** (should be parallel)
 4. User selects match → storage location + expiration
 5. Generates `PHOTO-{timestamp}` barcode
 
@@ -168,65 +195,158 @@ supabase functions deploy lookup-plu
 
 ---
 
-## Prioritized Fix Roadmap
+## Verified Priority Roadmap (Nov 28, 2025)
 
-### Phase 1: Critical Bug Fixes (Week 1)
-**Goal:** Fix data loss and breaking functionality
+### **Week 1: P0 Critical Fixes**
+**Goal:** Prevent data corruption and storage bloat
 
-| Priority | Issue | Effort | File(s) |
-|----------|-------|--------|---------|
-| P0 | Fix orphaned photo storage | Medium | BarcodeScanner.js:192-270 |
-| P0 | Add idempotency keys to edge functions | Medium | scanner-ingest, identify-by-photo |
-| P0 | Add cleanup job for stuck pending items | Low | New migration + pg_cron |
-| P1 | Fix AI Vision variety name preservation | Low | identify-by-photo:178-189 |
+| Priority | Issue | Effort | Files | Status |
+|----------|-------|--------|-------|--------|
+| P0 | Add cleanup job for stuck pending items | Low | New pg_cron migration | ❌ |
+| P0 | Fix orphaned photo storage | Medium | BarcodeScanner.js:192-270 | ❌ |
 
-### Phase 2: Performance Optimization (Week 2)
-**Goal:** Improve scan speed and UX
+### **Week 2: P1 High-Value Improvements**
+**Goal:** Quick wins for UX and best practices
 
-| Priority | Issue | Effort | Implementation |
-|----------|-------|--------|----------------|
-| P2 | Parallelize API calls (UPC + OFF) | Low | Promise.all() refactor |
-| P2 | Parallelize photo upload + DB insert | Medium | Async refactor |
-| P3 | Add request deduplication | Medium | Cache layer |
-| P3 | Surface API error messages | Low | User-facing error alerts |
+| Priority | Issue | Effort | Files | Status |
+|----------|-------|--------|-------|--------|
+| P1 | Parallelize API calls (UPC + OFF) | Low | scanner-ingest/index.ts:164-258 | ❌ |
+| P1 | Remove hardcoded household ID | Low | BarcodeScanner.js:42 | ❌ |
+| P1 | Add Sentry error tracking | Low | All components | ❌ |
 
-### Phase 3: Architecture & Code Quality (Week 3-4)
-**Goal:** Improve maintainability and scalability
+### **Month 1-2: P2 Quality Improvements**
+**Goal:** Improve data quality and prepare for scale
 
-| Priority | Issue | Effort | Implementation |
-|----------|-------|--------|----------------|
-| P4 | Refactor BarcodeScanner to state machine | High | XState integration |
-| P4 | Migrate components to TypeScript | High | Gradual migration |
-| P5 | Import IFPS PLU database | Medium | New table + migration |
-| P5 | Offload OCR to background | Medium | Worker thread |
+| Priority | Issue | Effort | Files |
+|----------|-------|--------|-------|
+| P2 | Add idempotency keys | Medium | scanner-ingest, identify-by-photo |
+| P2 | Fix AI Vision variety names | Low | identify-by-photo:178-189 |
+| P2 | Add request deduplication | Medium | Multiple locations |
 
-### Phase 4: Testing & Monitoring (Ongoing)
-| Task | Effort |
-|------|--------|
-| Add Vitest + React Testing Library | High |
-| Add Playwright E2E tests | High |
-| Implement Sentry error tracking | Low |
-| Add performance monitoring | Low |
+### **Deferred: P3-P5 (High Effort, Low Urgency)**
+- P4: Refactor BarcodeScanner to state machine (High effort)
+- P4: Migrate components to TypeScript (High effort)
+- P5: Import IFPS PLU database (Medium effort)
+- P5: Add Vitest + React Testing Library (High effort)
+- P5: Add Playwright E2E tests (High effort)
 
 ---
 
-## Database Optimization Needs
+## Database Optimization
 
-### Missing Indexes (Add in migration)
+### ✅ Composite Indexes (Already Added Nov 27)
 ```sql
--- Composite indexes for common queries
+-- Verified as existing
 CREATE INDEX idx_inventory_household_status ON inventory_items(household_id, status);
 CREATE INDEX idx_inventory_household_location ON inventory_items(household_id, storage_location_id);
 CREATE INDEX idx_inventory_household_barcode ON inventory_items(household_id, barcode);
-
--- Pending item cleanup query optimization
 CREATE INDEX idx_inventory_pending_created ON inventory_items(status, created_at) WHERE status = 'pending';
 ```
 
-### Cleanup Job Needed
+### ❌ Cleanup Job Needed (P0)
 ```sql
--- Delete items stuck in pending > 24 hours
-DELETE FROM inventory_items
-WHERE status = 'pending'
-  AND created_at < NOW() - INTERVAL '24 hours';
+-- Add to pg_cron (missing)
+SELECT cron.schedule(
+  'cleanup-stuck-pending-items',
+  '0 2 * * *',  -- Daily at 2am
+  $$
+    DELETE FROM inventory_items
+    WHERE status = 'pending'
+      AND created_at < NOW() - INTERVAL '24 hours'
+  $$
+);
 ```
+
+### ❌ Photo Cleanup Function (P0 Alternative)
+```sql
+-- Option: Scheduled cleanup of orphaned photos
+CREATE FUNCTION cleanup_orphaned_photos()
+RETURNS INTEGER AS $$
+DECLARE
+  deleted_count INTEGER := 0;
+BEGIN
+  -- Delete photos not referenced in inventory_items
+  DELETE FROM storage.objects
+  WHERE bucket_id = 'user-food-photos'
+    AND name NOT IN (
+      SELECT photo_thumb FROM inventory_items WHERE photo_thumb IS NOT NULL
+      UNION
+      SELECT photo_highres FROM inventory_items WHERE photo_highres IS NOT NULL
+    );
+
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule daily cleanup
+SELECT cron.schedule(
+  'cleanup-orphaned-photos',
+  '0 3 * * *',  -- Daily at 3am
+  'SELECT cleanup_orphaned_photos();'
+);
+```
+
+---
+
+## Code Quality Metrics (Verified)
+
+**BarcodeScanner.js:**
+- Lines: 1,294 (verified with `wc -l`)
+- useState hooks: 21 (verified with `grep -c`)
+- Complexity: Very High (multiple nested modals, state management)
+- TypeScript: No
+- Test Coverage: 0%
+
+**Edge Functions:**
+- Lines: ~500 each (scanner-ingest, identify-by-photo)
+- TypeScript: Yes ✅
+- Error handling: Partial (logs to database)
+- Rate limiting: No
+- Idempotency: No
+
+---
+
+## Next Actions (DO NOT TOUCH BarcodeScanner.js)
+
+### **Week 1: Stabilize (P0 - Database & Wrapper Only)**
+1. ❌ Add pg_cron job for stuck pending items (migration)
+2. ❌ Add orphaned photo cleanup function (migration)
+3. ❌ Wrap BarcodeScanner with ErrorBoundary (5-line wrapper)
+4. ❌ Add reset button to error boundary
+
+**Why?** Stop data loss WITHOUT touching fragile Scanner code
+
+### **Week 2: Edge Function Improvements (P1 - NOT BarcodeScanner.js)**
+1. ❌ Parallelize API calls in scanner-ingest edge function (Promise.allSettled)
+2. ❌ Add Sentry error tracking (monitoring only)
+3. ❌ Add idempotency keys to edge functions
+
+**Why?** Performance wins without risking state coupling bugs
+
+### **Week 3: Design State Machine (Planning, No Code)**
+1. ❌ Map all Scanner states (idle, scanning, reviewing, etc.)
+2. ❌ Map all events (SCAN, SELECT_LOCATION, CONFIRM, etc.)
+3. ❌ Map valid transitions (state diagram)
+4. ❌ Review design (Desktop Claude or peer review)
+
+**Why?** Design when calm, not frustrated
+
+### **Week 4-5: Rewrite Scanner (XState)**
+1. ❌ Build XState machine with tests
+2. ❌ Rebuild Scanner UI against machine (module by module)
+3. ❌ Replace BarcodeScanner.js
+4. ❌ Remove old code
+5. ✅ THEN fix hardcoded household ID (safe after rewrite)
+
+**Why?** Cannot safely fix 1,294-line monolith
+
+---
+
+**Handoff Status:** Complete and Verified
+**Code Quality:** B (functional but needs refactor)
+**Data Integrity:** C (pending items + orphaned photos need fixes)
+**Performance:** B- (sequential APIs slow scans)
+**Security:** A (RLS, JWT, service role correct)
+**Last Audit:** November 28, 2025
+**Next Review:** After P0/P1 fixes (December 15, 2025)
