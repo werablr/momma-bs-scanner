@@ -44,21 +44,26 @@
 
 ## Verified Issues (Nov 28, 2025)
 
-### 🔴 **P0 - Critical (Fix This Week)**
+### ✅ **P0 - Critical (Fixed Nov 28, 2025)**
 
-1. **Items Stuck in 'pending' Status** - `scanner-ingest:407`
+1. **Items Stuck in 'pending' Status** - ✅ FIXED
    - **Problem:** Step 1 creates item with `status='pending'`, if Step 2 fails (network timeout, session expire), item stuck forever
-   - **Verified:** Partial index exists (`idx_inventory_pending_created`), cleanup job missing
-   - **Impact:** Database corruption, inventory count bloat
-   - **Fix:** Add pg_cron job to cleanup items >24hrs old
-   - **Effort:** Low (30 minutes)
+   - **Solution:** Migration `20251128000000_add_pending_cleanup_job.sql`
+   - **Result:** pg_cron job runs daily at 2am UTC, deletes items >24hrs old
+   - **Impact:** Database corruption prevented
 
-2. **Orphaned Photo Storage** - `BarcodeScanner.js:192-270`
+2. **Orphaned Photo Storage** - ✅ FIXED
    - **Problem:** Photo uploads to Supabase Storage succeed, but if DB insert fails (invalid storage_location_id, RLS violation), file is orphaned forever
-   - **Verified:** No cleanup mechanism exists
-   - **Impact:** Storage bloat, costs grow unbounded
-   - **Fix:** Database-first insert OR cleanup function
-   - **Effort:** Medium (1-2 hours)
+   - **Solution:** Migration `20251128000001_add_orphaned_photo_cleanup.sql`
+   - **Result:** cleanup_orphaned_photos() function runs daily at 3am UTC
+   - **Impact:** Storage costs controlled
+
+3. **Scanner Crash Recovery** - ✅ FIXED
+   - **Problem:** Component crashes leave users stuck with no recovery
+   - **Solution:** ScannerErrorBoundary.tsx wrapper component
+   - **Result:** Error boundary catches crashes, reset button allows recovery
+   - **Files:** components/ScannerErrorBoundary.tsx, app/(tabs)/index.tsx
+   - **Impact:** Users can recover from errors without app restart
 
 ### 🟡 **P1 - High Priority (Next Week - EDGE FUNCTIONS ONLY, NOT BarcodeScanner.js)**
 
@@ -197,13 +202,16 @@ supabase functions deploy lookup-plu
 
 ## Verified Priority Roadmap (Nov 28, 2025)
 
-### **Week 1: P0 Critical Fixes**
+### **Week 1: P0 Critical Fixes** ✅ COMPLETE
 **Goal:** Prevent data corruption and storage bloat
 
 | Priority | Issue | Effort | Files | Status |
 |----------|-------|--------|-------|--------|
-| P0 | Add cleanup job for stuck pending items | Low | New pg_cron migration | ❌ |
-| P0 | Fix orphaned photo storage | Medium | BarcodeScanner.js:192-270 | ❌ |
+| P0 | Add cleanup job for stuck pending items | Low | Migration 20251128000000 | ✅ |
+| P0 | Fix orphaned photo storage | Medium | Migration 20251128000001 | ✅ |
+| P0 | Add error boundary for crash recovery | Low | ScannerErrorBoundary.tsx | ✅ |
+
+**Completed:** November 28, 2025
 
 ### **Week 2: P1 High-Value Improvements**
 **Goal:** Quick wins for UX and best practices
@@ -309,13 +317,13 @@ SELECT cron.schedule(
 
 ## Next Actions (DO NOT TOUCH BarcodeScanner.js)
 
-### **Week 1: Stabilize (P0 - Database & Wrapper Only)**
-1. ❌ Add pg_cron job for stuck pending items (migration)
-2. ❌ Add orphaned photo cleanup function (migration)
-3. ❌ Wrap BarcodeScanner with ErrorBoundary (5-line wrapper)
-4. ❌ Add reset button to error boundary
+### **Week 1: Stabilize (P0 - Database & Wrapper Only)** ✅ COMPLETE
+1. ✅ Add pg_cron job for stuck pending items (migration)
+2. ✅ Add orphaned photo cleanup function (migration)
+3. ✅ Wrap BarcodeScanner with ErrorBoundary (wrapper component)
+4. ✅ Add reset button to error boundary
 
-**Why?** Stop data loss WITHOUT touching fragile Scanner code
+**Completed:** November 28, 2025 - Data integrity protected without touching fragile code
 
 ### **Week 2: Edge Function Improvements (P1 - NOT BarcodeScanner.js)**
 1. ❌ Parallelize API calls in scanner-ingest edge function (Promise.allSettled)

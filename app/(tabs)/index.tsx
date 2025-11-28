@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import BarcodeScanner from '../../components/BarcodeScanner';
+import ScannerErrorBoundary from '../../components/ScannerErrorBoundary';
 import AuthScreen from '../../components/AuthScreen';
 import { useAuth } from '../../contexts/AuthContext';
 import scannerAPI from '../../services/scannerAPI';
@@ -86,7 +87,9 @@ export default function HomeScreen() {
           </View>
         </View>
       ) : (
-        <BarcodeScanner onProductScanned={handleProductScanned} />
+        <ScannerErrorBoundary>
+          <BarcodeScanner onProductScanned={handleProductScanned} />
+        </ScannerErrorBoundary>
       )}
     </View>
   );
