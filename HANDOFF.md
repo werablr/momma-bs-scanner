@@ -337,13 +337,17 @@ SELECT cron.schedule(
 
 **Completed:** November 28, 2025 - 50% faster barcode scanning without touching BarcodeScanner.js
 
-### **Week 3: Design State Machine (Planning, No Code)**
-1. ❌ Map all Scanner states (idle, scanning, reviewing, etc.)
-2. ❌ Map all events (SCAN, SELECT_LOCATION, CONFIRM, etc.)
-3. ❌ Map valid transitions (state diagram)
-4. ❌ Review design (Desktop Claude or peer review)
+### **Week 3: Design State Machine (Planning, No Code)** ✅ COMPLETE
+1. ✅ Map all Scanner states (idle, scanning, reviewing, etc.)
+2. ✅ Map all events (SCAN, SELECT_LOCATION, CONFIRM, etc.)
+3. ✅ Map valid transitions (state diagram)
+4. ✅ Review design (Desktop Claude peer review)
 
-**Why?** Design when calm, not frustrated
+**Completed:** November 29, 2025
+- `/Users/macmini/Desktop/docs/SCANNER_STATE_MACHINE_DESIGN_V3.1.md`
+- All 4 workflows mapped (barcode, PLU, photo, manual)
+- All implementation bugs fixed (photo workflow, retry state, async cleanup)
+- Approved by Desktop Claude - ready for implementation
 
 ### **Week 4-5: Rewrite Scanner (XState)**
 1. ❌ Build XState machine with tests
