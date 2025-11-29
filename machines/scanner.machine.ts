@@ -246,7 +246,7 @@ export const scannerMachine = setup({
       return data ? JSON.parse(data) : { scan_id: null }
     }),
 
-    clearPendingScan: fromPromise(async () => {
+    clearPendingScan: fromPromise(async (): Promise<void> => {
       await AsyncStorage.removeItem('pendingScan')
     }),
 
@@ -294,7 +294,7 @@ export const scannerMachine = setup({
     }),
 
     // Review actions
-    updateStatus: fromPromise(async ({ input }) => {
+    updateStatus: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
 
       // TODO: Replace with actual Supabase call
@@ -306,10 +306,9 @@ export const scannerMachine = setup({
       //   .update({ status: 'active' })
       //   .eq('id', context.scan_id)
       // if (error) throw error
-      // return context.completed_item
     }),
 
-    flagItemForReview: fromPromise(async ({ input }) => {
+    flagItemForReview: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
 
       // TODO: Replace with actual Supabase call
@@ -329,7 +328,7 @@ export const scannerMachine = setup({
     }),
 
     // Cleanup
-    deletePendingItem: fromPromise(async ({ input }) => {
+    deletePendingItem: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
 
       if (!context.scan_id) return

@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "orchestrator": "node src/agents/scanner_runtime_orchestrator.js",
     "orchestrator:verbose": "node src/agents/scanner_runtime_orchestrator.js --verbose",
     "verify-foundation": "node src/utils/verify_foundation.js",
@@ -78,10 +81,13 @@
     "@babel/core": "^7.25.2",
     "@expo/cli": "^0.24.15",
     "@react-native-community/cli": "^20.0.2",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.10",
     "babel-plugin-module-resolver": "^5.0.2",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
     "typescript": "~5.9.2"
   },
   "private": true,

@@ -355,8 +355,8 @@ SELECT cron.schedule(
 1. ✅ Install XState v5 (`xstate@5`)
 2. ✅ Create type definitions (`types/scanner.types.ts`)
 3. ✅ Create state machine (`machines/scanner.machine.ts`)
-4. ❌ Write unit tests for barcode workflow
-5. ❌ Mock all services for testing
+4. ✅ Add Jest testing framework
+5. 🟡 Write unit tests for barcode workflow (5/15 tests written)
 
 **Completed:** November 29, 2025
 - XState v5 installed
@@ -364,9 +364,11 @@ SELECT cron.schedule(
 - State machine with barcode workflow (camera permissions → scan → review → complete)
 - All guards, actions, actors defined per V3.1 design
 - Cleanup state for async deletePendingItem (V3.1 fix)
-- TODO comments marking Supabase integration points
+- **Explicit return types on all actors** (clearPendingScan, updateStatus, flagItemForReview, deletePendingItem: Promise<void>)
+- Jest + ts-jest configured
+- First 5 tests written (initial state, permissions flow, happy path start)
 
-**Next:** Unit tests, then UI integration
+**Next:** Complete remaining 10 unit tests, verify all pass, then UI integration
 
 **Phase 2-4:** (Not started)
 2. ❌ Rebuild Scanner UI against machine (module by module)
