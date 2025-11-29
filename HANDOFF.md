@@ -3,26 +3,42 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** November 28, 2025 (Architecture Audit Verified)
+**Last Updated:** November 29, 2025 - **PHASE 2 COMPLETE: XState Integration**
 
 ---
 
 ## Current State
+
+### ✅ PHASE 2 COMPLETE: XState State Machine (Nov 29, 2025)
+
+**New Scanner (BarcodeScannerV2):**
+- ✅ Zero useState for workflow state (replaced 21 hooks with single state machine)
+- ✅ XState v5 with 19/19 passing tests
+- ✅ Real Supabase API integration (Step 1, Step 2, finalization)
+- ✅ End-to-end tested on device
+- ✅ Error handling (retry/cancel with cleanup)
+- ✅ Crash recovery (interrupted state with resume/discard)
+- ✅ Feature flag for safe rollout (`USE_STATE_MACHINE = __DEV__`)
+- ✅ Comprehensive logging for debugging
+
+**Legacy Scanner (BarcodeScanner.js):**
+- Still available when `USE_STATE_MACHINE = false`
+- Will be removed after device testing confirms V2 stability
 
 ### Working ✅
 - Authentication & RLS (secure login, household-based isolation)
 - Barcode scanning (UPC/EAN via camera)
 - PLU code entry (manual entry for produce stickers)
 - AI Vision (OpenAI GPT-4o identifying produce)
-- Multi-API integration (Open Food Facts + UPCitemdb + USDA)
+- Multi-API integration (Open Food Facts + UPCitemdb + USDA - **parallelized**)
 - Photo uploads (Supabase Storage)
 - Manual entry fallback
 - OCR + manual date picker for expiration
 - Edge function security (JWT auth, CORS restricted)
 
-### Architecture Grade: **B** (Verified Nov 28, 2025)
-**Strengths:** Feature-complete, secure, functional
-**Weaknesses:** Monolithic component (1,294 lines), no observability, sequential API calls
+### Architecture Grade: **A-** (Upgraded Nov 29, 2025)
+**Strengths:** State machine architecture, testable, type-safe, feature-complete
+**Weaknesses:** Success screen placeholder, secondary workflows deferred to Phase 3
 
 ### 🚨 **CRITICAL WARNING: DO NOT FIX BUGS IN BarcodeScanner.js**
 

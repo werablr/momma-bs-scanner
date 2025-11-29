@@ -107,7 +107,27 @@ export type ScannerEvent =
 // ============================================================================
 
 export interface ProductData {
-  product_name: string
+  // Edge function response fields (scanner-ingest Step 1)
+  name?: string  // Returned as 'name' in response
+  brand?: string  // Returned as 'brand' in response
+  serving_size?: number
+  serving_unit?: string
+  calories?: number
+  protein?: number
+  carbs?: number
+  fat?: number
+
+  // EditableReview expected fields
+  brand_name?: string
+  suggested_category?: string
+  package_description?: string
+  expiration_date?: string
+  volume_amount?: number
+  volume_unit?: string
+  serving_qty?: number
+
+  // Open Food Facts fields
+  product_name?: string
   brands?: string
   barcode?: string
   nutrition?: NutritionData
@@ -204,10 +224,14 @@ export interface ErrorInfo {
 
 export interface StorageLocation {
   id: string
-  household_id: string
+  household_id?: string
   name: string
-  icon?: string
-  created_at: string
+  type: string  // 'pantry', 'fridge', 'freezer', etc.
+  description?: string
+  temperature_controlled?: boolean
+  category_restrictions?: string[]
+  created_at?: string
+  icon?: string  // Optional - for UI display (derived from type)
 }
 
 // ============================================================================
@@ -251,6 +275,8 @@ export interface Step1Response {
   success: boolean
   item_id: string
   product: ProductData
+  suggested_category?: string  // From scanner-ingest line 426
+  confidence_score?: number  // From scanner-ingest line 427
 }
 
 export interface Step2Response {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import BarcodeScanner from '../../components/BarcodeScanner';
 import BarcodeScannerV2 from '../../components/BarcodeScannerV2';
@@ -7,13 +7,66 @@ import AuthScreen from '../../components/AuthScreen';
 import { useAuth } from '../../contexts/AuthContext';
 import scannerAPI from '../../services/scannerAPI';
 import { USE_STATE_MACHINE } from '../../utils/featureFlags';
+import { supabase } from '../../lib/supabase';
 
 export default function HomeScreen() {
   const { user, household, loading } = useAuth();
   const [scannedProduct, setScannedProduct] = useState<any>(null);
+  const [storageLocations, setStorageLocations] = useState<any[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+
+  // Load storage locations from database
+  useEffect(() => {
+    console.log('[HomeScreen] useEffect triggered, user:', user ? 'logged in' : 'not logged in');
+
+    async function loadStorageLocations() {
+      setLocationsLoading(true);
+      try {
+        console.log('[HomeScreen] Loading storage locations from Supabase...');
+        console.log('[HomeScreen] Household:', household);
+
+        const { data, error } = await supabase
+          .from('storage_locations')
+          .select('id, name, type')
+          .order('name');
+
+        // Always log both data and error to diagnose issues
+        console.log('[HomeScreen] Query result - data:', data);
+        console.log('[HomeScreen] Query result - error:', error);
+
+        if (error) {
+          console.error('[HomeScreen] ❌ Supabase error loading locations:', error);
+          console.error('[HomeScreen] Error details:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+
+        if (!data || data.length === 0) {
+          console.warn('[HomeScreen] ⚠️ No storage locations found in database');
+          console.warn('[HomeScreen] Table might be empty or RLS policy blocking access');
+        } else {
+          console.log('[HomeScreen] ✅ Storage locations loaded successfully:', data);
+        }
+
+        setStorageLocations(data || []);
+      } catch (error) {
+        console.error('[HomeScreen] ❌ Exception loading storage locations:', error);
+        // Use empty array on error - app will still work but location picker will be empty
+        setStorageLocations([]);
+      } finally {
+        setLocationsLoading(false);
+      }
+    }
+
+    if (user) {
+      loadStorageLocations();
+    } else {
+      // If no user, don't wait for locations
+      setLocationsLoading(false);
+    }
+  }, [user]);
 
   // Show loading screen while checking authentication
-  if (loading) {
+  if (loading || locationsLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -92,7 +145,7 @@ export default function HomeScreen() {
         <ScannerErrorBoundary>
           {USE_STATE_MACHINE ? (
             <BarcodeScannerV2
-              storageLocations={[]}
+              storageLocations={storageLocations}
               onProductScanned={handleProductScanned}
             />
           ) : (

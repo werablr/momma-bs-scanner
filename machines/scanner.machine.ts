@@ -19,6 +19,7 @@ import { setup, assign, fromPromise } from 'xstate'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Camera } from 'react-native-vision-camera'
 import { Linking } from 'react-native'
+import { supabase } from '../lib/supabase'
 import {
   ScannerContext,
   ScannerEvent,
@@ -225,101 +226,136 @@ export const scannerMachine = setup({
     }),
 
     clearPendingScan: fromPromise(async (): Promise<void> => {
+      console.log('[clearPendingScan] Removing persisted scan from AsyncStorage...')
       await AsyncStorage.removeItem('pendingScan')
+      console.log('[clearPendingScan] ✅ Persisted scan cleared')
     }),
 
     // Barcode workflow - Step 1 (create pending item)
     callStep1: fromPromise(async ({ input }): Promise<Step1Response> => {
       const { context } = input as { context: ScannerContext }
 
-      // TODO: Replace with actual Supabase edge function call
-      // This is a mock implementation for Phase 1
-      throw new Error('callStep1 not implemented - add Supabase client')
+      console.log('[callStep1] Starting Step 1 API call...')
+      console.log('[callStep1] Barcode:', context.barcode)
+      console.log('[callStep1] Storage location:', context.storage_location_id)
 
-      // Real implementation:
-      // const { data, error } = await supabase.functions.invoke('scanner-ingest', {
-      //   body: {
-      //     workflow: 'two-step',
-      //     step: 1,
-      //     barcode: context.barcode,
-      //     storage_location_id: context.storage_location_id,
-      //   }
-      // })
-      // if (error) throw error
-      // return data as Step1Response
+      const { data, error } = await supabase.functions.invoke('scanner-ingest', {
+        body: {
+          workflow: 'two-step',
+          step: 1,
+          barcode: context.barcode,
+          storage_location_id: context.storage_location_id,
+        },
+      })
+
+      if (error) {
+        console.error('[callStep1] ❌ Error from edge function:', error)
+        throw error
+      }
+
+      if (!data) {
+        console.error('[callStep1] ❌ No data returned from scanner-ingest')
+        throw new Error('No data returned from scanner-ingest')
+      }
+
+      console.log('[callStep1] ✅ Step 1 success:', data)
+      return data as Step1Response
     }),
 
     // Barcode workflow - Step 2 (update expiration)
     callStep2: fromPromise(async ({ input }): Promise<Step2Response> => {
       const { context } = input as { context: ScannerContext }
 
-      // TODO: Replace with actual Supabase edge function call
-      throw new Error('callStep2 not implemented - add Supabase client')
+      console.log('[callStep2] Starting Step 2 API call...')
+      console.log('[callStep2] scan_id:', context.scan_id)
+      console.log('[callStep2] expiration_date:', context.expiration_date)
 
-      // Real implementation:
-      // const { data, error } = await supabase.functions.invoke('scanner-ingest', {
-      //   body: {
-      //     workflow: 'two-step',
-      //     step: 2,
-      //     scan_id: context.scan_id,
-      //     extracted_date: context.expiration_date,
-      //     ocr_text: context.ocr_text,
-      //     confidence: context.ocr_confidence,
-      //   }
-      // })
-      // if (error) throw error
-      // return data as Step2Response
+      // Handle expiration_date which could be Date, string, or null/undefined
+      let extractedDate = null
+      if (context.expiration_date) {
+        if (context.expiration_date instanceof Date) {
+          extractedDate = context.expiration_date.toISOString()
+        } else if (typeof context.expiration_date === 'string') {
+          extractedDate = context.expiration_date
+        }
+      }
+
+      console.log('[callStep2] extracted_date (ISO):', extractedDate)
+
+      const { data, error } = await supabase.functions.invoke('scanner-ingest', {
+        body: {
+          workflow: 'two-step',
+          step: 2,
+          scan_id: context.scan_id,
+          extracted_date: extractedDate,
+          ocr_text: context.ocr_text,
+          confidence: context.ocr_confidence,
+        },
+      })
+
+      if (error) {
+        console.error('[callStep2] ❌ Error from edge function:', error)
+        throw error
+      }
+
+      if (!data) {
+        console.error('[callStep2] ❌ No data returned from Step 2')
+        throw new Error('No data returned from scanner-ingest Step 2')
+      }
+
+      console.log('[callStep2] ✅ Step 2 success:', data)
+      return data as Step2Response
     }),
 
     // Review actions
     updateStatus: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
 
-      // TODO: Replace with actual Supabase call
-      throw new Error('updateStatus not implemented - add Supabase client')
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ status: 'active' })
+        .eq('id', context.scan_id)
 
-      // Real implementation:
-      // const { error } = await supabase
-      //   .from('inventory_items')
-      //   .update({ status: 'active' })
-      //   .eq('id', context.scan_id)
-      // if (error) throw error
+      if (error) throw error
     }),
 
     flagItemForReview: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
 
-      // TODO: Replace with actual Supabase call
-      throw new Error('flagItemForReview not implemented - add Supabase client')
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({
+          flagged_for_review: true,
+          flag_reason: context.flag_reason,
+          flag_notes: context.flag_notes,
+          status: 'active',
+        })
+        .eq('id', context.scan_id)
 
-      // Real implementation:
-      // const { error } = await supabase
-      //   .from('inventory_items')
-      //   .update({
-      //     flagged_for_review: true,
-      //     flag_reason: context.flag_reason,
-      //     flag_notes: context.flag_notes,
-      //     status: 'active'
-      //   })
-      //   .eq('id', context.scan_id)
-      // if (error) throw error
+      if (error) throw error
     }),
 
     // Cleanup
     deletePendingItem: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
 
-      if (!context.scan_id) return
+      if (!context.scan_id) {
+        console.log('[deletePendingItem] No scan_id, skipping delete')
+        return
+      }
 
-      // TODO: Replace with actual Supabase call
-      throw new Error('deletePendingItem not implemented - add Supabase client')
+      console.log(`[deletePendingItem] Deleting pending item: ${context.scan_id}`)
+      const { error } = await supabase
+        .from('inventory_items')
+        .delete()
+        .eq('id', context.scan_id)
+        .eq('status', 'pending')
 
-      // Real implementation:
-      // await supabase
-      //   .from('inventory_items')
-      //   .delete()
-      //   .eq('id', context.scan_id)
-      //   .eq('status', 'pending')
+      if (error) {
+        console.error('[deletePendingItem] ❌ Delete failed:', error)
+        throw error
+      }
+      console.log('[deletePendingItem] ✅ Pending item deleted')
     }),
   },
 }).createMachine({
@@ -405,8 +441,7 @@ export const scannerMachine = setup({
               guard: 'hasScanId',
             },
             DISCARD: {
-              target: 'idle',
-              actions: ['resetContext'],
+              target: '#scanner.processing.cleaningUp',
             },
           },
         },
@@ -574,6 +609,19 @@ export const scannerMachine = setup({
           invoke: {
             src: 'deletePendingItem',
             input: ({ context }) => ({ context }),
+            onDone: {
+              target: 'clearingPersistedState',
+            },
+            onError: {
+              // Even if delete fails, still clear AsyncStorage
+              target: 'clearingPersistedState',
+            },
+          },
+        },
+
+        clearingPersistedState: {
+          invoke: {
+            src: 'clearPendingScan',
             onDone: {
               target: '#scanner.ready.idle',
               actions: 'resetContext',
