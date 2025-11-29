@@ -215,16 +215,16 @@ supabase functions deploy lookup-plu
 
 **Completed:** November 28, 2025
 
-### **Week 2: P1 High-Value Improvements** 🟢 1/3 COMPLETE
+### **Week 2: P1 High-Value Improvements** ✅ 2/3 COMPLETE
 **Goal:** Quick wins for UX and best practices
 
 | Priority | Issue | Effort | Files | Status |
 |----------|-------|--------|-------|--------|
 | P1 | Parallelize API calls (UPC + OFF) | Low | scanner-ingest/index.ts:166-250 | ✅ |
+| P1 | Add Sentry error tracking | Low | app/_layout.tsx, ScannerErrorBoundary.tsx | ✅ |
 | P1 | Remove hardcoded household ID | Low | BarcodeScanner.js:42 | ⚠️ DEFERRED |
-| P1 | Add Sentry error tracking | Low | All components | ❌ |
 
-**Completed:** November 28, 2025 (Parallelize API calls)
+**Completed:** November 28, 2025 (Parallelize API calls, Sentry error tracking)
 **Deferred:** Remove hardcoded household ID (requires BarcodeScanner.js changes, wait for state machine rewrite)
 
 ### **Month 1-2: P2 Quality Improvements**
