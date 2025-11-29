@@ -614,10 +614,40 @@ export const scannerMachine = setup({
       states: {
         retryable: {
           on: {
-            RETRY: {
-              target: ({ context }) =>
-                context.retry_state || '#scanner.processing.selectingLocation',
-            },
+            RETRY: [
+              {
+                target: '#scanner.processing.uploadingPhoto',
+                guard: ({ context }) => context.retry_state === 'processing.uploadingPhoto',
+              },
+              {
+                target: '#scanner.processing.callingPhotoAPI',
+                guard: ({ context }) => context.retry_state === 'processing.callingPhotoAPI',
+              },
+              {
+                target: '#scanner.processing.identifyingWithAI',
+                guard: ({ context }) => context.retry_state === 'processing.identifyingWithAI',
+              },
+              {
+                target: '#scanner.scanning.plu',
+                guard: ({ context }) => context.retry_state === 'scanning.plu',
+              },
+              {
+                target: '#scanner.scanning.manual',
+                guard: ({ context }) => context.retry_state === 'scanning.manual',
+              },
+              {
+                target: '#scanner.processing.capturingExpiration',
+                guard: ({ context }) => context.retry_state === 'processing.capturingExpiration',
+              },
+              {
+                target: '#scanner.processing.reviewing',
+                guard: ({ context }) => context.retry_state === 'processing.reviewing',
+              },
+              // Fallback to location selection (barcode workflow default)
+              {
+                target: '#scanner.processing.selectingLocation',
+              },
+            ],
             CANCEL: '#scanner.ready.idle',
           },
         },
