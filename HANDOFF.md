@@ -240,9 +240,39 @@ supabase functions deploy lookup-plu
 | P2 | Fix AI Vision variety names | Low | identify-by-photo:178-189 |
 | P2 | Add request deduplication | Medium | Multiple locations |
 
+### **Week 3-4: State Machine Rewrite** 🟡 IN PROGRESS
+**Goal:** Replace BarcodeScanner.js with XState state machine
+
+#### Phase 1: Machine Implementation ✅ COMPLETE
+- ✅ Install XState v5 and implement scanner state machine (Nov 29)
+- ✅ Write comprehensive unit tests (19/19 passing)
+- ✅ Refactor to XState v5 patterns (inline guards for invoke completions)
+- ✅ Create React Native mocks for Jest testing
+
+#### Phase 2: UI Integration 🟡 IN PROGRESS (Dec 2025)
+- 🟡 **Step 1: Create BarcodeScannerV2 skeleton** - IN PROGRESS
+  - Created BarcodeScannerV2.tsx with useMachine integration
+  - Zero useState hooks for workflow state
+  - All UI derived from state.matches()
+  - Feature flag: USE_STATE_MACHINE = __DEV__
+- ⏳ Step 2: Camera flow (permissions, barcode detection)
+- ⏳ Step 3: Processing flow (location, expiration, review)
+- ⏳ Step 4: Error & complete states
+- ⏳ Step 5: Device testing and verification
+
+#### Phase 3: Additional Workflows (Deferred to Week 5+)
+- PLU workflow
+- Photo workflow
+- Manual entry workflow
+- Crash recovery
+
+**Files:**
+- machines/scanner.machine.ts (687 lines, tested)
+- machines/__tests__/scanner.machine.test.ts (709 lines, 19 tests)
+- components/BarcodeScannerV2.tsx (NEW - Phase 2)
+- utils/featureFlags.ts (NEW)
+
 ### **Deferred: P3-P5 (High Effort, Low Urgency)**
-- P4: Refactor BarcodeScanner to state machine (High effort)
-- P4: Migrate components to TypeScript (High effort)
 - P5: Import IFPS PLU database (Medium effort)
 - P5: Add Vitest + React Testing Library (High effort)
 - P5: Add Playwright E2E tests (High effort)
