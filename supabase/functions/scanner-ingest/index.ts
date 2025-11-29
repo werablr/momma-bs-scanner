@@ -159,102 +159,94 @@ serve(async (req) => {
           packageUnit = catalogProduct.package_unit
           sourcesPriority = 'catalog_cached'
         } else {
-          console.log('✗ Not in catalog, calling APIs...')
+          console.log('✗ Not in catalog, calling APIs in parallel...')
 
-          // PRIORITY 2: Call UPCitemdb API for package size & pricing (also fallback for product data)
-          console.log('Calling UPCitemdb API...')
-          try {
-            const upcitemdbResponse = await fetch(
-              `https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`,
-              {
-                headers: {
-                  'Accept': 'application/json',
-                  'User-Agent': 'MommaBsScanner/1.0',
-                },
+          // PERFORMANCE: Call both APIs in parallel using Promise.allSettled
+          // This reduces total API time from ~4-6 seconds to ~2-3 seconds
+          const [upcResult, offResult] = await Promise.allSettled([
+            // API 1: UPCitemdb for package size & pricing
+            fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`, {
+              headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'MommaBsScanner/1.0',
+              },
+            }).then(res => res.ok ? res.json() : null),
+
+            // API 2: Open Food Facts for health scores & nutrition
+            fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`, {
+              headers: {
+                'User-Agent': 'MommaBsScanner/1.0 (nutritional tracking app)',
+              },
+            }).then(res => res.ok ? res.json() : null),
+          ])
+
+          // Process UPCitemdb result
+          if (upcResult.status === 'fulfilled' && upcResult.value) {
+            upcitemdbData = upcResult.value
+            console.log('✓ UPCitemdb raw response:', JSON.stringify(upcitemdbData).substring(0, 300))
+            const item = upcitemdbData?.items?.[0]
+
+            if (item && (item.title || item.description)) {
+              console.log('✓ UPCitemdb found product:', item.title || item.description)
+
+              // Use UPCitemdb data as fallback if OFF didn't find product
+              if (!product) {
+                await dbLog(supabaseClient, 'info', 'Using UPCitemdb as fallback product source', { title: item.title }, barcode)
+                console.log('→ Using UPCitemdb as primary product source')
+                product = extractUPCProduct(item)
               }
-            )
 
-            if (upcitemdbResponse.ok) {
-              upcitemdbData = await upcitemdbResponse.json()
-              console.log('✓ UPCitemdb raw response:', JSON.stringify(upcitemdbData).substring(0, 300))
-              const item = upcitemdbData?.items?.[0]
-
-              if (item && (item.title || item.description)) {
-                console.log('✓ UPCitemdb found product:', item.title || item.description)
-
-                // Use UPCitemdb data as fallback if OFF didn't find product
-                if (!product) {
-                  await dbLog(supabaseClient, 'info', 'Using UPCitemdb as fallback product source', { title: item.title }, barcode)
-                  console.log('→ Using UPCitemdb as primary product source')
-                  product = extractUPCProduct(item)
-                }
-
-                // Parse package size from title (e.g., "BUSH'S Black Beans 15 oz")
-                if (item.title) {
-                  const parsed = parsePackageSizeFromTitle(item.title)
-                  if (parsed) {
-                    packageSize = parsed.size
-                    packageUnit = parsed.unit
-                    console.log(`✓ Parsed package size from title: ${packageSize} ${packageUnit}`)
-                  }
+              // Parse package size from title (e.g., "BUSH'S Black Beans 15 oz")
+              if (item.title) {
+                const parsed = parsePackageSizeFromTitle(item.title)
+                if (parsed) {
+                  packageSize = parsed.size
+                  packageUnit = parsed.unit
+                  console.log(`✓ Parsed package size from title: ${packageSize} ${packageUnit}`)
                 }
               }
-            } else {
-              console.log('✗ UPCitemdb API failed:', upcitemdbResponse.status)
             }
-          } catch (error) {
-            console.error('UPCitemdb API error:', error)
-            // Continue without UPCitemdb data
+          } else if (upcResult.status === 'rejected') {
+            console.error('UPCitemdb API error:', upcResult.reason)
+          } else {
+            console.log('✗ UPCitemdb API returned no data')
           }
 
-          // PRIORITY 4: Call Open Food Facts API for health scores & environmental data (also fallback)
-          console.log('Calling Open Food Facts API...')
-          try {
-            const offResponse = await fetch(
-              `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`,
-              {
-                headers: {
-                  'User-Agent': 'MommaBsScanner/1.0 (nutritional tracking app)',
-                },
+          // Process Open Food Facts result
+          if (offResult.status === 'fulfilled' && offResult.value) {
+            openfoodfactsData = offResult.value
+
+            if (openfoodfactsData.status === 1 && openfoodfactsData.product) {
+              console.log('✓ Open Food Facts found product')
+              const offProduct = openfoodfactsData.product
+
+              // Extract nutrition data from OFF
+              offNutrition = extractOFFNutrition(offProduct)
+
+              // If still no product data, use Open Food Facts as final fallback
+              if (!product && offProduct.product_name) {
+                console.log('→ Using Open Food Facts as primary product source')
+                product = extractOFFProduct(offProduct)
               }
-            )
 
-            if (offResponse.ok) {
-              openfoodfactsData = await offResponse.json()
-
-              if (openfoodfactsData.status === 1 && openfoodfactsData.product) {
-                console.log('✓ Open Food Facts found product')
-                const offProduct = openfoodfactsData.product
-
-                // Extract nutrition data from OFF
-                offNutrition = extractOFFNutrition(offProduct)
-
-                // If still no product data, use Open Food Facts as final fallback
-                if (!product && offProduct.product_name) {
-                  console.log('→ Using Open Food Facts as primary product source')
-                  product = extractOFFProduct(offProduct)
+              // Try to get package size from Open Food Facts if not already found
+              if (!packageSize && offProduct.product_quantity) {
+                const quantity = parseFloat(offProduct.product_quantity)
+                const unit = offProduct.product_quantity_unit || 'g'
+                if (!isNaN(quantity)) {
+                  packageSize = quantity
+                  packageUnit = unit
+                  console.log(`✓ Got package size from Open Food Facts: ${packageSize} ${packageUnit}`)
                 }
-
-                // Try to get package size from Open Food Facts if not already found
-                if (!packageSize && offProduct.product_quantity) {
-                  const quantity = parseFloat(offProduct.product_quantity)
-                  const unit = offProduct.product_quantity_unit || 'g'
-                  if (!isNaN(quantity)) {
-                    packageSize = quantity
-                    packageUnit = unit
-                    console.log(`✓ Got package size from Open Food Facts: ${packageSize} ${packageUnit}`)
-                  }
-                }
-              } else {
-                console.log('✗ Product not found in Open Food Facts')
-                openfoodfactsData = null
               }
             } else {
-              console.log('✗ Open Food Facts API failed:', offResponse.status)
+              console.log('✗ Product not found in Open Food Facts')
+              openfoodfactsData = null
             }
-          } catch (error) {
-            console.error('Open Food Facts API error:', error)
-            // Continue without Open Food Facts data
+          } else if (offResult.status === 'rejected') {
+            console.error('Open Food Facts API error:', offResult.reason)
+          } else {
+            console.log('✗ Open Food Facts API returned no data')
           }
 
           // Final check: Did we get product data from ANY source?
