@@ -10,6 +10,11 @@ module.exports = {
     '!**/*.d.ts',
     '!**/node_modules/**',
   ],
+  moduleNameMapper: {
+    '^react-native$': '<rootDir>/__mocks__/react-native.ts',
+    '^react-native-vision-camera$': '<rootDir>/__mocks__/react-native-vision-camera.ts',
+    '^@react-native-async-storage/async-storage$': '<rootDir>/__mocks__/@react-native-async-storage/async-storage.ts',
+  },
   globals: {
     'ts-jest': {
       tsconfig: {

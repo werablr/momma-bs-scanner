@@ -62,6 +62,7 @@ export type ScannerEvent =
   | { type: 'START_MANUAL_ENTRY' }
   | { type: 'CANCEL' }
   | { type: 'SCAN_ANOTHER' }
+  | { type: 'START_NEW_SCAN' }
 
   // Camera permissions
   | { type: 'OPEN_SETTINGS' }
@@ -84,8 +85,11 @@ export type ScannerEvent =
   // Common workflow steps
   | { type: 'LOCATION_SELECTED'; location_id: string }
   | { type: 'EXPIRATION_CAPTURED'; date: Date; ocr_text: string; confidence: number }
+  | { type: 'EXPIRATION_ENTERED'; date: Date }
+  | { type: 'OCR_DETECTED'; date: Date }
   | { type: 'EXPIRATION_SKIPPED' }
   | { type: 'REVIEW_APPROVED' }
+  | { type: 'REVIEW_REJECTED' }
   | { type: 'REVIEW_FLAGGED'; reason: string; notes: string }
 
   // Error handling
@@ -93,6 +97,8 @@ export type ScannerEvent =
   | { type: 'MANUAL_ENTRY_FALLBACK' }
 
   // Crash recovery
+  | { type: 'RESUME_SCAN' }
+  | { type: 'DISCARD_PENDING' }
   | { type: 'RESUME' }
   | { type: 'DISCARD' }
 
@@ -225,12 +231,16 @@ export type ScannerStateValue =
       | 'capturingExpiration'
       | 'updatingExpiration'
       | 'savingManual'
+      | 'manualEntry'
       | 'reviewing'
       | 'flagging'
       | 'finalizing'
       | 'cleaningUp'
     }
   | { error: 'retryable' | 'noMatches' | 'fatal' }
+  | 'retry'
+  | 'noProduct'
+  | 'recoveryPrompt'
   | 'complete'
 
 // ============================================================================

@@ -27,6 +27,7 @@ import {
   PersistedScanData,
   Step1Response,
   Step2Response,
+  InventoryItem,
 } from '../types/scanner.types'
 
 // ============================================================================
@@ -42,15 +43,9 @@ export const scannerMachine = setup({
   // ==========================================================================
   // Guards (Validation for Transitions)
   // ==========================================================================
+  // Note: Guards for invoke completions are defined inline in onDone transitions (XState v5 pattern)
   guards: {
-    // Camera permissions
-    hasPermission: ({ event }) => {
-      return event.type === 'done.invoke.checkCameraPermission'
-        ? (event.output as CameraPermissionResponse).hasPermission
-        : false
-    },
-
-    // Input validation
+    // Input validation (user-triggered events)
     isValidBarcode: ({ event }) => {
       if (event.type !== 'BARCODE_DETECTED') return false
       return event.barcode && event.barcode.length >= 8
@@ -72,26 +67,6 @@ export const scannerMachine = setup({
     // Workflow type guards
     isBarcodeWorkflow: ({ context }) => {
       return context.mode === 'barcode'
-    },
-
-    // API response validation
-    isProductFound: ({ event }) => {
-      if (event.type !== 'done.invoke.callStep1') return false
-      const data = event.output as Step1Response
-      return data && data.product !== null && data.product !== undefined
-    },
-
-    isProductNotFound: ({ event }) => {
-      if (event.type !== 'done.invoke.callStep1') return false
-      const data = event.output as Step1Response
-      return !data || !data.product
-    },
-
-    // Crash recovery
-    hasPendingScan: ({ event }) => {
-      if (event.type !== 'done.invoke.loadPersisted') return false
-      const data = event.output as PersistedScanData
-      return data && data.scan_id !== null
     },
   },
 
@@ -124,21 +99,23 @@ export const scannerMachine = setup({
       },
     }),
 
-    // Store product from API
+    // Store product from API (used in onDone transition - event.output is typed)
     storeProduct: assign({
       product: ({ event }) => {
-        if (event.type !== 'done.invoke.callStep1') return null
-        const data = event.output as Step1Response
-        return data.product
+        // In onDone context, event is DoneActorEvent with typed output
+        if (!('output' in event) || !event.output) return null
+        const output = event.output as Step1Response
+        return output.product
       },
     }),
 
-    // Store scan ID from API
+    // Store scan ID from API (used in onDone transition - event.output is typed)
     storeScanId: assign({
       scan_id: ({ event }) => {
-        if (event.type !== 'done.invoke.callStep1') return null
-        const data = event.output as Step1Response
-        return data.item_id
+        // In onDone context, event is DoneActorEvent with typed output
+        if (!('output' in event) || !event.output) return null
+        const output = event.output as Step1Response
+        return output.item_id
       },
     }),
 
@@ -170,23 +147,24 @@ export const scannerMachine = setup({
       },
     }),
 
-    // Store completed item
+    // Store completed item (used in onDone transition)
     storeCompletedItem: assign({
       completed_item: ({ event }) => {
-        if (event.type !== 'done.invoke.updateStatus') return null
-        return event.output
+        // In onDone context, this is already properly typed
+        if (!('output' in event)) return null
+        return event.output as InventoryItem
       },
     }),
 
-    // Store error
+    // Store error (used in onError transitions)
     storeError: assign({
       error: ({ event }) => {
-        if (!event.type.includes('error.invoke')) return null
-        const errorData = event as any
+        // In onError transitions, event has .error property (XState internal event type)
+        const err = (event as any).error
         return {
-          message: errorData.error?.message || 'Unknown error',
-          code: errorData.error?.code || null,
-          type: classifyError(errorData.error?.message || ''),
+          message: err?.message || 'Unknown error',
+          code: err?.code || null,
+          type: classifyError(err?.message || ''),
           retryable: true,
         }
       },
@@ -200,9 +178,9 @@ export const scannerMachine = setup({
     // Reset context to initial state
     resetContext: assign(() => initialScannerContext),
 
-    // Restore context from crash recovery
+    // Restore context from crash recovery (used in onDone transition)
     restoreContext: assign(({ event }) => {
-      if (event.type !== 'done.invoke.loadPersisted') return initialScannerContext
+      if (!('output' in event) || !event.output) return initialScannerContext
       const data = event.output as PersistedScanData
       return { ...initialScannerContext, ...data.context }
     }),
@@ -360,7 +338,7 @@ export const scannerMachine = setup({
         onDone: [
           {
             target: 'ready',
-            guard: 'hasPermission',
+            guard: ({ event }) => event.output.hasPermission,
           },
           {
             target: 'requestingPermission',
@@ -375,7 +353,7 @@ export const scannerMachine = setup({
         onDone: [
           {
             target: 'ready',
-            guard: 'hasPermission',
+            guard: ({ event }) => event.output.hasPermission,
           },
           {
             target: 'permissionDenied',
@@ -410,7 +388,7 @@ export const scannerMachine = setup({
             onDone: [
               {
                 target: 'interrupted',
-                guard: 'hasPendingScan',
+                guard: ({ event }) => event.output.scan_id !== null,
                 actions: 'restoreContext',
               },
               {
@@ -453,6 +431,7 @@ export const scannerMachine = setup({
     // Scanning State (Barcode Only in Phase 1)
     // ========================================================================
     scanning: {
+      initial: 'barcode',
       states: {
         barcode: {
           on: {
@@ -475,6 +454,7 @@ export const scannerMachine = setup({
     // Processing State (Barcode Workflow)
     // ========================================================================
     processing: {
+      initial: 'selectingLocation',
       entry: 'persistState',
 
       states: {
@@ -496,12 +476,13 @@ export const scannerMachine = setup({
             onDone: [
               {
                 target: 'capturingExpiration',
-                guard: 'isProductFound',
+                guard: ({ event }) =>
+                  event.output && event.output.product !== null && event.output.product !== undefined,
                 actions: ['storeProduct', 'storeScanId'],
               },
               {
                 target: '#scanner.error.noMatches',
-                guard: 'isProductNotFound',
+                guard: ({ event }) => !event.output || !event.output.product,
                 actions: 'storeError',
               },
             ],
@@ -610,30 +591,12 @@ export const scannerMachine = setup({
     // Error States
     // ========================================================================
     error: {
+      initial: 'retryable',
       states: {
         retryable: {
           on: {
             RETRY: [
-              {
-                target: '#scanner.processing.uploadingPhoto',
-                guard: ({ context }) => context.retry_state === 'processing.uploadingPhoto',
-              },
-              {
-                target: '#scanner.processing.callingPhotoAPI',
-                guard: ({ context }) => context.retry_state === 'processing.callingPhotoAPI',
-              },
-              {
-                target: '#scanner.processing.identifyingWithAI',
-                guard: ({ context }) => context.retry_state === 'processing.identifyingWithAI',
-              },
-              {
-                target: '#scanner.scanning.plu',
-                guard: ({ context }) => context.retry_state === 'scanning.plu',
-              },
-              {
-                target: '#scanner.scanning.manual',
-                guard: ({ context }) => context.retry_state === 'scanning.manual',
-              },
+              // Phase 1: Barcode workflow retry states only
               {
                 target: '#scanner.processing.capturingExpiration',
                 guard: ({ context }) => context.retry_state === 'processing.capturingExpiration',
@@ -646,6 +609,12 @@ export const scannerMachine = setup({
               {
                 target: '#scanner.processing.selectingLocation',
               },
+              // Phase 2+: Add these when implemented
+              // - processing.uploadingPhoto
+              // - processing.callingPhotoAPI
+              // - processing.identifyingWithAI
+              // - scanning.plu
+              // - scanning.manual
             ],
             CANCEL: '#scanner.ready.idle',
           },

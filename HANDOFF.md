@@ -224,7 +224,11 @@ supabase functions deploy lookup-plu
 | P1 | Add Sentry error tracking | Low | app/_layout.tsx, ScannerErrorBoundary.tsx | ✅ |
 | P1 | Remove hardcoded household ID | Low | BarcodeScanner.js:42 | ⚠️ DEFERRED |
 
-**Completed:** November 28, 2025 (Parallelize API calls, Sentry error tracking)
+**Completed:** November 29, 2025
+- Parallelized API calls (scanner-ingest edge function using Promise.allSettled)
+- Sentry installed (@sentry/react-native v7.7.0, configured in app/_layout.tsx)
+- Error boundary integration (ScannerErrorBoundary.tsx sends errors to Sentry)
+
 **Deferred:** Remove hardcoded household ID (requires BarcodeScanner.js changes, wait for state machine rewrite)
 
 ### **Month 1-2: P2 Quality Improvements**
@@ -330,12 +334,14 @@ SELECT cron.schedule(
 
 **Completed:** November 28, 2025 - Data integrity protected without touching fragile code
 
-### **Week 2: Edge Function Improvements (P1 - NOT BarcodeScanner.js)** 🟢 1/3 COMPLETE
+### **Week 2: Edge Function Improvements (P1 - NOT BarcodeScanner.js)** ✅ 2/3 COMPLETE
 1. ✅ Parallelize API calls in scanner-ingest edge function (Promise.allSettled)
-2. ❌ Add Sentry error tracking (monitoring only)
-3. ❌ Add idempotency keys to edge functions
+2. ✅ Add Sentry error tracking (monitoring only)
+3. ❌ Add idempotency keys to edge functions (P2 - deferred)
 
-**Completed:** November 28, 2025 - 50% faster barcode scanning without touching BarcodeScanner.js
+**Completed:** November 29, 2025
+- 50% faster barcode scanning (4-6s → 2-3s) without touching BarcodeScanner.js
+- Full error tracking enabled (@sentry/react-native, app/_layout.tsx, ScannerErrorBoundary.tsx)
 
 ### **Week 3: Design State Machine (Planning, No Code)** ✅ COMPLETE
 1. ✅ Map all Scanner states (idle, scanning, reviewing, etc.)
