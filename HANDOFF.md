@@ -349,14 +349,30 @@ SELECT cron.schedule(
 - All implementation bugs fixed (photo workflow, retry state, async cleanup)
 - Approved by Desktop Claude - ready for implementation
 
-### **Week 4-5: Rewrite Scanner (XState)**
-1. ❌ Build XState machine with tests
+### **Week 4-5: Rewrite Scanner (XState)** 🟡 IN PROGRESS
+
+**Phase 1: Core Infrastructure (Week 4)** - In Progress
+1. ✅ Install XState v5 (`xstate@5`)
+2. ✅ Create type definitions (`types/scanner.types.ts`)
+3. ✅ Create state machine (`machines/scanner.machine.ts`)
+4. ❌ Write unit tests for barcode workflow
+5. ❌ Mock all services for testing
+
+**Completed:** November 29, 2025
+- XState v5 installed
+- Complete TypeScript types for context, events, states
+- State machine with barcode workflow (camera permissions → scan → review → complete)
+- All guards, actions, actors defined per V3.1 design
+- Cleanup state for async deletePendingItem (V3.1 fix)
+- TODO comments marking Supabase integration points
+
+**Next:** Unit tests, then UI integration
+
+**Phase 2-4:** (Not started)
 2. ❌ Rebuild Scanner UI against machine (module by module)
 3. ❌ Replace BarcodeScanner.js
 4. ❌ Remove old code
 5. ✅ THEN fix hardcoded household ID (safe after rewrite)
-
-**Why?** Cannot safely fix 1,294-line monolith
 
 ---
 
