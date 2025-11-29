@@ -3,9 +3,21 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import * as Sentry from '@sentry/react-native';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider } from '../contexts/AuthContext';
+
+// Initialize Sentry for error tracking
+// Only enable if SENTRY_DSN is configured in app.json
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    tracesSampleRate: 0.1, // 10% performance monitoring
+    debug: __DEV__, // Enable debug in development
+    environment: __DEV__ ? 'development' : 'production',
+  });
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

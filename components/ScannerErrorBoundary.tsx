@@ -34,8 +34,17 @@ export default class ScannerErrorBoundary extends Component<Props, State> {
     console.error('Scanner Error:', error);
     console.error('Error Info:', errorInfo);
 
-    // TODO: Send to error tracking service (Sentry) when implemented
-    // Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } });
+    // Send to Sentry if configured
+    if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+      const Sentry = require('@sentry/react-native');
+      Sentry.captureException(error, {
+        contexts: {
+          react: {
+            componentStack: errorInfo.componentStack,
+          },
+        },
+      });
+    }
   }
 
   handleReset = () => {

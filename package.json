@@ -38,6 +38,7 @@
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
+    "@sentry/react-native": "^7.7.0",
     "@supabase/supabase-js": "^2.50.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.0.1",
