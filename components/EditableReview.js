@@ -178,6 +178,9 @@ export default function EditableReview({
 
   const getChangedFields = () => {
     const changes = {};
+    // Defensive check - should not happen after early return above
+    if (!productData) return changes;
+
     Object.keys(editedData).forEach(key => {
       if (editedData[key] !== productData[key]?.toString()) {
         changes[key] = {
@@ -207,11 +210,12 @@ export default function EditableReview({
     setShowFlagModal(false);
   };
 
+  // Early return if no productData - must happen before calling getChangedFields()
+  if (!productData) return null;
+
   const storageLocation = (storageLocations || STORAGE_LOCATIONS).find(loc => loc.id === selectedStorage);
   const hasChanges = Object.keys(getChangedFields()).length > 0;
   const hasWarnings = validationWarnings.length > 0;
-
-  if (!productData) return null;
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true}>
