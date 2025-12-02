@@ -3,11 +3,36 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** November 29, 2025 - **PHASE 2 COMPLETE: XState Integration**
+**Last Updated:** December 2, 2025 - **PHASE 3: PLU Workflow 90% Complete**
 
 ---
 
 ## Current State
+
+### 🔄 PHASE 3 IN PROGRESS: PLU Workflow (Dec 1-2, 2025)
+
+**PLU Workflow (90% Complete):**
+- ✅ State machine integration (`machines/scanner.machine.ts`)
+  - `lookupPLU` actor → calls `lookup-plu` edge function
+  - `createPLUItem` actor → creates inventory item directly (no Step 1/Step 2)
+  - Auto-select single match, selection UI for multiple matches
+- ✅ PLU entry UI (`BarcodeScannerV2.tsx`)
+  - PLU input screen with 4-5 digit validation
+  - Match selection screen for multiple USDA results
+- ✅ `lookup-plu` edge function updated for direct FDC ID lookup (deployed)
+- ✅ End-to-end tested: PLU 4011 (bananas) → item created successfully
+
+**BLOCKING: PLU Database Tech Debt**
+- Current: ~33 hardcoded PLU codes in edge function
+- Required: 1,547 IFPS standard PLU codes
+- **Solution:** Create `plu_codes` table in Supabase
+  - ✅ IFPS CSV with 1,547 PLU codes acquired
+  - ✅ 194 unique commodities identified
+  - ✅ FDC ID mapping verified: 142/144 commodities mapped via local USDA database
+  - ✅ Mapping file: `commodity_fdc_LOCAL_VERIFIED.csv`
+  - ⏳ **Awaiting Brian's approval** to proceed with migrations
+  - Pending: Migrations to create table + import data
+  - Pending: Update edge function to query table instead of hardcoded object
 
 ### ✅ PHASE 2 COMPLETE: XState State Machine (Nov 29, 2025)
 
@@ -15,7 +40,7 @@
 - ✅ Zero useState for workflow state (replaced 21 hooks with single state machine)
 - ✅ XState v5 with 19/19 passing tests
 - ✅ Real Supabase API integration (Step 1, Step 2, finalization)
-- ✅ End-to-end tested on device
+- ✅ End-to-end tested on device (barcode workflow)
 - ✅ Error handling (retry/cancel with cleanup)
 - ✅ Crash recovery (interrupted state with resume/discard)
 - ✅ Feature flag for safe rollout (`USE_STATE_MACHINE = __DEV__`)

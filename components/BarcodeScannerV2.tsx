@@ -9,8 +9,8 @@
  * Based on SCANNER_STATE_MACHINE_DESIGN_V3.1.md
  */
 
-import React, { useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Modal } from 'react-native';
 import { useMachine } from '@xstate/react';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { useCodeScanner } from 'react-native-vision-camera';
@@ -87,13 +87,17 @@ export default function BarcodeScannerV2({
 
       // Scanning states
       showCamera: state.matches({ scanning: 'barcode' }),
+      showPLUEntry: state.matches({ scanning: 'plu' }),
 
       // Processing states
+      showMatchSelection: state.matches({ processing: 'selectingMatch' }),
       showLocationPicker: state.matches({ processing: 'selectingLocation' }),
       showExpirationCapture: state.matches({ processing: 'capturingExpiration' }),
       showReview: state.matches({ processing: 'reviewing' }),
       isLoading:
         state.matches({ processing: 'callingBarcodeAPI' }) ||
+        state.matches({ processing: 'lookingUpPLU' }) ||
+        state.matches({ processing: 'creatingPLUItem' }) ||
         state.matches({ processing: 'updatingExpiration' }) ||
         state.matches({ processing: 'finalizing' }),
 
@@ -118,6 +122,14 @@ export default function BarcodeScannerV2({
     () => ({
       onBarcodeScanned: (code: string, type: string) => {
         send({ type: 'BARCODE_DETECTED', barcode: code, barcodeType: type });
+      },
+
+      onPLUEntered: (pluCode: string) => {
+        send({ type: 'PLU_ENTERED', plu_code: pluCode });
+      },
+
+      onMatchSelected: (match: any, quantity?: number) => {
+        send({ type: 'MATCH_SELECTED', match, quantity });
       },
 
       onLocationSelected: (location: any) => {
@@ -238,7 +250,7 @@ export default function BarcodeScannerV2({
           <View style={styles.homeContent}>
             <Text style={styles.welcomeText}>Scanner Ready</Text>
             <Text style={styles.instructionText}>
-              Tap the button below to start scanning barcodes
+              Choose how you want to add items
             </Text>
 
             <TouchableOpacity
@@ -248,6 +260,16 @@ export default function BarcodeScannerV2({
             >
               <View style={styles.buttonInner}>
                 <Text style={styles.startScanButtonText}>📱 Scan Barcode</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.startScanButton, styles.secondaryButton]}
+              onPress={() => send({ type: 'START_PLU_ENTRY' })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.secondaryButtonText}>🔢 Enter PLU Code</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -303,6 +325,18 @@ export default function BarcodeScannerV2({
         </View>
       )}
 
+      {/* PLU ENTRY SCREEN - scanning.plu state */}
+      {ui.showPLUEntry && <PLUEntryScreen onSubmit={handlers.onPLUEntered} onCancel={handlers.onCancel} />}
+
+      {/* MATCH SELECTION SCREEN - processing.selectingMatch state */}
+      {ui.showMatchSelection && state.context.matches && (
+        <MatchSelectionScreen
+          matches={state.context.matches}
+          onSelect={handlers.onMatchSelected}
+          onCancel={handlers.onCancel}
+        />
+      )}
+
       {/* STORAGE LOCATION PICKER - processing.selectingLocation */}
       <StorageLocationPicker
         visible={ui.showLocationPicker}
@@ -326,16 +360,19 @@ export default function BarcodeScannerV2({
       />
 
       {/* REVIEW SCREEN - processing.reviewing */}
-      <EditableReview
-        visible={ui.showReview}
-        onClose={handlers.onCancel}
-        onApprove={handlers.onReviewApproved}
-        onFlag={handlers.onReviewFlagged}
-        productData={state.context.product}
-        selectedStorage={state.context.storage_location_id}
-        storageLocations={storageLocations}
-        loading={false}
-      />
+      {/* Only render when product exists to prevent null crashes */}
+      {ui.showReview && state.context.product && (
+        <EditableReview
+          visible={ui.showReview}
+          onClose={handlers.onCancel}
+          onApprove={handlers.onReviewApproved}
+          onFlag={handlers.onReviewFlagged}
+          productData={state.context.product}
+          selectedStorage={state.context.storage_location_id}
+          storageLocations={storageLocations}
+          loading={false}
+        />
+      )}
 
       {/* ERROR SCREEN - error.retryable / error.noMatches / error.fatal */}
       {ui.showError && (
@@ -387,9 +424,54 @@ export default function BarcodeScannerV2({
         </View>
       )}
 
+      {/* SUCCESS SCREEN - complete state */}
       {ui.showSuccess && (
-        <View style={styles.content}>
-          <Text style={styles.stateIndicator}>✅ Success! (TODO)</Text>
+        <View style={styles.homeScreen}>
+          <View style={styles.homeContent}>
+            <Text style={styles.successIcon}>✅</Text>
+            <Text style={styles.successTitle}>Item Added Successfully</Text>
+
+            {/* Product name */}
+            {(state.context.product?.name || state.context.product?.product_name) && (
+              <Text style={styles.successProductName}>
+                {state.context.product.name || state.context.product.product_name}
+              </Text>
+            )}
+
+            {/* Storage location */}
+            {state.context.storage_location_id && (
+              <Text style={styles.successDetails}>
+                Added to:{' '}
+                {storageLocations.find((loc) => loc.id === state.context.storage_location_id)
+                  ?.name || 'Storage'}
+              </Text>
+            )}
+
+            {/* Scan Another button */}
+            <TouchableOpacity
+              style={styles.startScanButton}
+              onPress={handlers.onScanAnother}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.startScanButtonText}>📱 Scan Another</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Optional: View Inventory button */}
+            <TouchableOpacity
+              style={[styles.startScanButton, styles.secondaryButton]}
+              onPress={() => {
+                // Navigate to inventory list (Phase 3 - navigation not yet implemented)
+                console.log('[Success] View Inventory button pressed (not yet implemented)')
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.secondaryButtonText}>📦 View Inventory</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -399,6 +481,165 @@ export default function BarcodeScannerV2({
         </View>
       )}
     </View>
+  );
+}
+
+// ============================================================================
+// PLU Entry Screen Component
+// ============================================================================
+
+interface PLUEntryScreenProps {
+  onSubmit: (pluCode: string) => void;
+  onCancel: () => void;
+}
+
+function PLUEntryScreen({ onSubmit, onCancel }: PLUEntryScreenProps) {
+  const [pluCode, setPLUCode] = useState('');
+
+  const handleSubmit = () => {
+    if (pluCode.length >= 4 && pluCode.length <= 5 && /^\d+$/.test(pluCode)) {
+      onSubmit(pluCode);
+    }
+  };
+
+  return (
+    <View style={styles.homeScreen}>
+      <View style={styles.homeContent}>
+        <Text style={styles.welcomeText}>Enter PLU Code</Text>
+        <Text style={styles.instructionText}>
+          Enter the 4-5 digit code from the produce sticker
+        </Text>
+
+        <TextInput
+          style={styles.pluInput}
+          value={pluCode}
+          onChangeText={setPLUCode}
+          placeholder="e.g., 4011"
+          placeholderTextColor="#666"
+          keyboardType="number-pad"
+          maxLength={5}
+          autoFocus
+        />
+
+        <TouchableOpacity
+          style={[
+            styles.startScanButton,
+            pluCode.length < 4 && styles.disabledButton,
+          ]}
+          onPress={handleSubmit}
+          disabled={pluCode.length < 4}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonInner}>
+            <Text style={styles.startScanButtonText}>✓ Lookup PLU</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.startScanButton, styles.discardButton]}
+          onPress={onCancel}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonInner}>
+            <Text style={styles.startScanButtonText}>✕ Cancel</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// Match Selection Screen Component
+// ============================================================================
+
+interface MatchSelectionScreenProps {
+  matches: any[];
+  onSelect: (match: any, quantity?: number) => void;
+  onCancel: () => void;
+}
+
+function MatchSelectionScreen({ matches, onSelect, onCancel }: MatchSelectionScreenProps) {
+  const [selectedMatch, setSelectedMatch] = useState<any>(null);
+  const [quantity, setQuantity] = useState('1');
+
+  const handleSelect = () => {
+    if (selectedMatch) {
+      onSelect(selectedMatch, parseInt(quantity) || 1);
+    }
+  };
+
+  return (
+    <Modal visible={true} animationType="slide" transparent={false}>
+      <View style={styles.matchSelectionContainer}>
+        <View style={styles.matchSelectionHeader}>
+          <Text style={styles.matchSelectionTitle}>Select Product</Text>
+          <Text style={styles.matchSelectionSubtitle}>
+            Choose the best match for your item
+          </Text>
+        </View>
+
+        <FlatList
+          data={matches}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.matchItem,
+                selectedMatch === item && styles.matchItemSelected,
+              ]}
+              onPress={() => setSelectedMatch(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.matchItemName}>
+                {item.product_name || item.description || 'Unknown Product'}
+              </Text>
+              {item.nutrition?.energy_kcal && (
+                <Text style={styles.matchItemDetails}>
+                  {item.nutrition.energy_kcal} cal per serving
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+        />
+
+        {selectedMatch && (
+          <View style={styles.quantityContainer}>
+            <Text style={styles.quantityLabel}>Quantity:</Text>
+            <TextInput
+              style={styles.quantityInput}
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+          </View>
+        )}
+
+        <View style={styles.matchSelectionActions}>
+          <TouchableOpacity
+            style={[styles.matchActionButton, styles.matchCancelButton]}
+            onPress={onCancel}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.matchCancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.matchActionButton,
+              styles.matchSelectButton,
+              !selectedMatch && styles.disabledButton,
+            ]}
+            onPress={handleSelect}
+            disabled={!selectedMatch}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.matchSelectButtonText}>Select</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -598,5 +839,160 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     marginTop: 20,
+  },
+  // Success screen styles
+  successIcon: {
+    fontSize: 80,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#34C759',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  successProductName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  successDetails: {
+    fontSize: 16,
+    color: '#ccc',
+    marginBottom: 40,
+    textAlign: 'center',
+  },
+  secondaryButton: {
+    backgroundColor: '#1C1C1E',
+    marginTop: 15,
+  },
+  secondaryButtonText: {
+    color: '#34C759',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // PLU Entry screen styles
+  pluInput: {
+    backgroundColor: '#2C2C2E',
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#34C759',
+    marginBottom: 30,
+    width: '80%',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  // Match Selection screen styles
+  matchSelectionContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+  },
+  matchSelectionHeader: {
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: '#2C2C2E',
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  matchSelectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  matchSelectionSubtitle: {
+    fontSize: 14,
+    color: '#ccc',
+  },
+  matchItem: {
+    backgroundColor: '#2C2C2E',
+    padding: 20,
+    marginHorizontal: 15,
+    marginTop: 15,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#444',
+  },
+  matchItemSelected: {
+    borderColor: '#34C759',
+    backgroundColor: '#1C3A28',
+  },
+  matchItemName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  matchItemDetails: {
+    fontSize: 14,
+    color: '#ccc',
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#2C2C2E',
+    borderTopWidth: 1,
+    borderTopColor: '#444',
+  },
+  quantityLabel: {
+    fontSize: 18,
+    color: '#fff',
+    marginRight: 15,
+  },
+  quantityInput: {
+    backgroundColor: '#1a1a1a',
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#34C759',
+    width: 80,
+  },
+  matchSelectionActions: {
+    flexDirection: 'row',
+    padding: 15,
+    backgroundColor: '#2C2C2E',
+    borderTopWidth: 1,
+    borderTopColor: '#444',
+  },
+  matchActionButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  matchCancelButton: {
+    backgroundColor: '#FF3B30',
+  },
+  matchSelectButton: {
+    backgroundColor: '#34C759',
+  },
+  matchCancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  matchSelectButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

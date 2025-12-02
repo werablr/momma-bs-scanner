@@ -6,25 +6,70 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// PLU code database - maps PLU codes to USDA search terms
-const PLU_DATABASE: { [key: string]: string } = {
-  '4011': 'banana raw', '94011': 'banana raw organic',
-  '3283': 'apple honeycrisp raw', '4130': 'apple granny smith raw',
-  '4131': 'apple gala raw', '4133': 'apple golden delicious raw',
-  '4135': 'apple red delicious raw', '4015': 'apple gala raw',
-  '3107': 'orange navel raw', '4012': 'orange navel raw',
-  '4409': 'pear bartlett raw', '4410': 'pear bosc raw',
-  '4023': 'grape red seedless raw', '4499': 'grape green seedless raw',
-  '4087': 'strawberry raw', '4033': 'blueberry raw',
-  '4044': 'peach raw', '4042': 'nectarine raw',
-  '4031': 'cantaloupe raw', '4032': 'watermelon raw',
-  '4048': 'lime raw', '4053': 'lemon raw',
-  '4030': 'kiwi raw', '4052': 'mango raw',
-  '4061': 'lettuce iceberg raw', '4062': 'lettuce romaine raw',
-  '4060': 'broccoli raw', '4069': 'cauliflower raw',
-  '4072': 'carrot raw', '4082': 'onion yellow raw',
-  '4065': 'pepper bell green raw', '4688': 'pepper bell red raw',
-  '4664': 'tomato raw', '4078': 'avocado raw',
+// PLU code database - maps PLU codes directly to USDA FDC IDs
+// FDC IDs are from USDA FoodData Central SR Legacy database
+const PLU_DATABASE: { [key: string]: { fdc_id: number; name: string } } = {
+  // Bananas
+  '4011': { fdc_id: 173944, name: 'Bananas, raw' },
+  '94011': { fdc_id: 173944, name: 'Bananas, raw (organic)' },
+
+  // Apples
+  '3283': { fdc_id: 171688, name: 'Apples, raw, with skin' },
+  '4130': { fdc_id: 171688, name: 'Apples, raw, granny smith' },
+  '4131': { fdc_id: 171688, name: 'Apples, raw, gala' },
+  '4133': { fdc_id: 171688, name: 'Apples, raw, golden delicious' },
+  '4135': { fdc_id: 171688, name: 'Apples, raw, red delicious' },
+  '4015': { fdc_id: 171688, name: 'Apples, raw, gala' },
+
+  // Oranges
+  '3107': { fdc_id: 169097, name: 'Oranges, raw, navels' },
+  '4012': { fdc_id: 169097, name: 'Oranges, raw, navels' },
+
+  // Pears
+  '4409': { fdc_id: 169118, name: 'Pears, raw' },
+  '4410': { fdc_id: 169118, name: 'Pears, raw' },
+
+  // Grapes
+  '4023': { fdc_id: 174683, name: 'Grapes, red or green, raw' },
+  '4499': { fdc_id: 174683, name: 'Grapes, red or green, raw' },
+
+  // Berries
+  '4087': { fdc_id: 167762, name: 'Strawberries, raw' },
+  '4033': { fdc_id: 171711, name: 'Blueberries, raw' },
+
+  // Stone fruits
+  '4044': { fdc_id: 169900, name: 'Peaches, raw' },
+  '4042': { fdc_id: 169921, name: 'Nectarines, raw' },
+
+  // Melons
+  '4031': { fdc_id: 169092, name: 'Melons, cantaloupe, raw' },
+  '4032': { fdc_id: 167765, name: 'Watermelon, raw' },
+
+  // Citrus
+  '4048': { fdc_id: 167746, name: 'Limes, raw' },
+  '4053': { fdc_id: 167747, name: 'Lemons, raw, without peel' },
+
+  // Tropical
+  '4030': { fdc_id: 167753, name: 'Kiwifruit, green, raw' },
+  '4052': { fdc_id: 169910, name: 'Mangos, raw' },
+
+  // Lettuce
+  '4061': { fdc_id: 169248, name: 'Lettuce, iceberg, raw' },
+  '4062': { fdc_id: 169249, name: 'Lettuce, cos or romaine, raw' },
+
+  // Vegetables
+  '4060': { fdc_id: 170379, name: 'Broccoli, raw' },
+  '4069': { fdc_id: 170388, name: 'Cauliflower, raw' },
+  '4072': { fdc_id: 170393, name: 'Carrots, raw' },
+  '4082': { fdc_id: 170000, name: 'Onions, raw' },
+
+  // Peppers
+  '4065': { fdc_id: 170427, name: 'Peppers, sweet, green, raw' },
+  '4688': { fdc_id: 170108, name: 'Peppers, sweet, red, raw' },
+
+  // Other
+  '4664': { fdc_id: 170457, name: 'Tomatoes, red, ripe, raw' },
+  '4078': { fdc_id: 171705, name: 'Avocados, raw, all commercial varieties' },
 }
 
 serve(async (req) => {
@@ -42,8 +87,8 @@ serve(async (req) => {
     console.log('🔢 Looking up PLU code:', pluCode)
 
     // Look up PLU code in our database
-    const searchTerm = PLU_DATABASE[pluCode]
-    if (!searchTerm) {
+    const pluData = PLU_DATABASE[pluCode]
+    if (!pluData) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -54,69 +99,49 @@ serve(async (req) => {
       )
     }
 
-    console.log('📖 PLU code maps to:', searchTerm)
+    console.log('📖 PLU code maps to:', pluData.name, '(FDC ID:', pluData.fdc_id + ')')
 
     const usdaApiKey = Deno.env.get('USDA_API_KEY')
     if (!usdaApiKey) {
       throw new Error('USDA_API_KEY not configured')
     }
 
-    // Search USDA FoodData Central using the mapped search term
-    const searchUrl = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(searchTerm)}&dataType=Foundation,SR Legacy&pageSize=10&api_key=${usdaApiKey}`
+    // Direct lookup by FDC ID - returns exact match, no fuzzy search
+    const lookupUrl = `https://api.nal.usda.gov/fdc/v1/food/${pluData.fdc_id}?api_key=${usdaApiKey}`
 
-    console.log('Searching USDA for:', searchTerm)
-    const response = await fetch(searchUrl)
+    console.log('Fetching USDA food:', pluData.fdc_id)
+    const response = await fetch(lookupUrl)
 
     if (!response.ok) {
       throw new Error(`USDA API error: ${response.status}`)
     }
 
-    const data = await response.json()
+    const food = await response.json()
 
-    if (!data.foods || data.foods.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'No matches found for this PLU code',
-          matches: []
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Create single match from direct lookup
+    const match = {
+      source: 'usda',
+      fdc_id: food.fdcId,
+      product_name: pluData.name, // Use our friendly name instead of USDA's technical description
+      description: food.description || pluData.name,
+      brands: '',
+      image_url: null,
+      image_thumb_url: null,
+      nutrition: extractUSDANutrition(food.foodNutrients || []),
+      data_type: food.dataType,
+      scientific_name: food.scientificName || null,
+      ndb_number: food.ndbNumber || null,
+      food_code: food.foodCode || null,
+      gtin_upc: food.gtinUpc || null,
     }
 
-    // Map results to match format
-    const matches = data.foods
-      .filter((food: any) => {
-        const desc = (food.description || '').toLowerCase()
-        // Filter for raw produce only
-        return !desc.includes('canned') &&
-               !desc.includes('frozen') &&
-               !desc.includes('dried') &&
-               !desc.includes('cooked')
-      })
-      .slice(0, 10)
-      .map((food: any) => ({
-        source: 'usda',
-        fdc_id: food.fdcId,
-        product_name: food.description || 'Unknown',
-        brands: '',
-        image_url: null,
-        image_thumb_url: null,
-        nutrition: extractUSDANutrition(food.foodNutrients || []),
-        data_type: food.dataType,
-        scientific_name: food.scientificName || null,
-        ndb_number: food.ndbNumber || null,
-        food_code: food.foodCode || null,
-        gtin_upc: food.gtinUpc || null,
-      }))
-
-    console.log(`✅ Found ${matches.length} matches for PLU ${pluCode}`)
+    console.log(`✅ Found exact match for PLU ${pluCode}:`, pluData.name)
 
     return new Response(
       JSON.stringify({
         success: true,
         plu_code: pluCode,
-        matches: matches
+        matches: [match] // Single match - no selection needed
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

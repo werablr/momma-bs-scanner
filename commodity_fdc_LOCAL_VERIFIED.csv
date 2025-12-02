@@ -1,0 +1,145 @@
+commodity,usda_fdc_id,usda_description,category
+ALFALFA SPROUTS,168384,"Alfalfa seeds, sprouted, raw",nut
+ALMONDS,170567,"Nuts, almonds",nut
+APPLES,171688,"Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",fruit
+APRICOTS,171697,"Apricots, raw",vegetable
+ARTICHOKES,169205,"Artichokes, (globe or french), raw",vegetable
+ARUGULA/ROCKET,169387,"Arugula, raw",vegetable
+ASPARAGUS,168389,"Asparagus, raw",vegetable
+AVOCADOS,171705,"Avocados, raw, all commercial varieties",vegetable
+Amaranth/Callaloo/Een Choy,168385,"Amaranth leaves, raw",vegetable
+BANANAS,173944,"Bananas, raw",fruit
+BASIL,172232,"Basil, fresh",vegetable
+BAY LEAVES,170917,"Spices, bay leaf",herb
+BEAN SPROUTS,169957,"Mung beans, mature seeds, sprouted, raw",nut
+BEANS,169961,"Beans, snap, green, raw",vegetable
+BEET GREENS,170375,"Beet greens, raw",vegetable
+BEETS,169145,"Beets, raw",vegetable
+BELGIAN ENDIVE (WITLOOF CHICORY),168412,"Endive, raw",vegetable
+BITTER MELON/BITTER GOURD,168391,"Balsam-pear (bitter gourd), leafy tips, raw",vegetable
+BOK CHOY (PAK CHOI),170390,"Cabbage, chinese (pak-choi), raw",vegetable
+BONIATO,168482,"Sweet potato, raw, unprepared (Includes foods for USDA's Food Distribution Program)",vegetable
+BRAZILNUTS,170569,"Nuts, brazilnuts, dried, unblanched",nut
+BREADFRUIT,171714,"Breadfruit, raw",fruit
+BROCCOLI,170379,"Broccoli, raw",vegetable
+BRUSSELS SPROUTS,170383,"Brussels sprouts, raw",vegetable
+CABBAGE,169975,"Cabbage, raw",vegetable
+CACTUS LEAVES (Nopales/Cactus Pads),168571,"Nopales, raw",vegetable
+CACTUS PEAR (PRICKLY PEAR),167750,"Prickly pears, raw",vegetable
+CARAMBOLA (STARFRUIT),171715,"Carambola, (starfruit), raw",fruit
+CARDOON (CARDONI),169981,"Cardoon, raw",vegetable
+CARROTS,170393,"Carrots, raw",vegetable
+CASHEWS,170162,"Nuts, cashew nuts, raw",nut
+CAULIFLOWER,169986,"Cauliflower, raw",vegetable
+CELERY,169988,"Celery, raw",vegetable
+CELERY ROOT/CELERIAC,170400,"Celeriac, raw",vegetable
+CHARD (SWISS CHARD)/SILVERBEET,169991,"Chard, swiss, raw",vegetable
+CHERIMOYA,173953,"Cherimoya, raw",vegetable
+CHERRIES,171719,"Cherries, sweet, raw",vegetable
+CHERVIL,171318,"Spices, chervil, dried",herb
+CHESTNUTS,170574,"Nuts, chestnuts, european, raw, unpeeled",nut
+CHICKPEAS,173756,"Chickpeas (garbanzo beans, bengal gram), mature seeds, raw",nut
+CHIVES,169994,"Chives, raw",vegetable
+GAI (GUI) CHOY (CHINESE or INDIAN MUSTARD),169256,"Mustard greens, raw",vegetable
+GAI LAN,169404,"Broccoli, chinese, raw",vegetable
+CILANTRO (CHINESE PARSLEY/CORIANDER),169997,"Coriander (cilantro) leaves, raw",vegetable
+COCONUTS,170169,"Nuts, coconut meat, raw",nut
+CORN,168538,"Corn, sweet, white, raw",vegetable
+CUCUMBER,168409,"Cucumber, with peel, raw",vegetable
+CURRANTS,173963,"Currants, european black, raw",vegetable
+DAIKON,168451,"Radishes, oriental, raw",vegetable
+DATES,168191,"Dates, medjool",vegetable
+DILL,172233,"Dill weed, fresh",vegetable
+EGGPLANT (AUBERGINE),169228,"Eggplant, raw",vegetable
+ENDIVE/CHICORY,168412,"Endive, raw",vegetable
+ESCAROLE/BATAVIAN CHICORY,168413,"Escarole, cooked, boiled, drained, no salt added",vegetable
+FEIJOA,168176,"Feijoa, raw",vegetable
+FENNEL,169385,"Fennel, bulb, raw",vegetable
+FIDDLEHEAD FERNS,169405,"Fiddlehead ferns, raw",vegetable
+FIGS,173021,"Figs, raw",vegetable
+FILBERTS,170581,"Nuts, hazelnuts or filberts",nut
+GARLIC,169230,"Garlic, raw",vegetable
+GINGER ROOT,169231,"Ginger root, raw",vegetable
+GOBO ROOT/BURDOCK,169974,"Burdock root, raw",vegetable
+GRAPEFRUIT,173033,"Grapefruit, raw, pink and red and white, all areas",fruit
+GRAPES,173040,"Grapes, muscadine, raw",fruit
+GUAVA,173044,"Guavas, common, raw",vegetable
+HORSERADISH ROOT,171833,"Sauce, horseradish",vegetable
+JACKFRUIT,174687,"Jackfruit, raw",fruit
+JICAMA/YAM BEAN,170073,"Yambean (jicama), raw",vegetable
+KALE,168421,"Kale, raw",vegetable
+KIWIFRUIT,168153,"Kiwifruit, green, raw",fruit
+KOHLRABI,168424,"Kohlrabi, raw",vegetable
+KUMQUAT,168154,"Kumquats, raw",vegetable
+LEEKS,169246,"Leeks, (bulb and lower leaf-portion), raw",vegetable
+LEMONS,167746,"Lemons, raw, without peel",vegetable
+LETTUCE,168429,"Lettuce, butterhead (includes boston and bibb types), raw",vegetable
+LIMES,168155,"Limes, raw",vegetable
+LONGAN,169089,"Longans, raw",vegetable
+LOQUATS,169908,"Loquats, raw",vegetable
+LOTUS ROOT,169250,"Lotus root, raw",vegetable
+LYCHEES,169086,"Litchis, raw",vegetable
+MACADAMIA,170178,"Nuts, macadamia nuts, raw",nut
+MALANGA,169401,"Yautia (tannier), raw",vegetable
+MAMEY,169909,"Mammy-apple, (mamey), raw",fruit
+MANGO,169910,"Mangos, raw",vegetable
+MANGOSTEEN,169090,"Mangosteen, canned, syrup pack",vegetable
+MARJORAM,170928,"Spices, marjoram, dried",herb
+MELON,169092,"Melons, cantaloupe, raw",fruit
+MUSHROOMS,169251,"Mushrooms, white, raw",vegetable
+NECTARINE,169914,"Nectarines, raw",vegetable
+OKRA,169260,"Okra, raw",vegetable
+ONIONS,170000,"Onions, raw",vegetable
+ORANGES,169917,"Oranges, raw, navels (Includes foods for USDA's Food Distribution Program)",fruit
+OREGANO,171328,"Spices, oregano, dried",herb
+OYSTER PLANT/SALSIFY,169277,"Salsify, (vegetable oyster), raw",vegetable
+PAPAYA/PAWPAW,169926,"Papayas, raw",vegetable
+PARSLEY,170416,"Parsley, fresh",vegetable
+PARSNIP,170417,"Parsnips, raw",vegetable
+PASSION FRUIT,169108,"Passion-fruit, (granadilla), purple, raw",fruit
+PEACHES,169928,"Peaches, yellow, raw",fruit
+PEANUTS,172430,"Peanuts, all types, raw",nut
+PEARS,169118,"Pears, raw",fruit
+PEAS,170419,"Peas, green, raw",vegetable
+PECANS,169424,"Nuts, pecans, dry roasted, with salt added",nut
+PEPPERS (CAPSICUMS),170427,"Peppers, sweet, green, raw",vegetable
+PERSIMMON,169941,"Persimmons, japanese, raw",vegetable
+PHYSALIS/CAPE GOOSEBERRY/GROUND CHERRY,173043,"Groundcherries, (cape-gooseberries or poha), raw",vegetable
+PINE NUTS (PIGNOLI),170591,"Nuts, pine nuts, dried",nut
+PINEAPPLE,168193,"Pineapple, raw, traditional varieties",fruit
+PISTACHIO,170184,"Nuts, pistachio nuts, raw",nut
+PITAHAYA,,"Not found in SR Legacy",vegetable
+PLUMS,169949,"Plums, raw",fruit
+POMEGRANATE,169134,"Pomegranates, raw",vegetable
+POTATO,170032,"Potatoes, raw, skin",vegetable
+PRUNES,167751,"Plums, dried (prunes), stewed, without added sugar",fruit
+PUMPKIN,168448,"Pumpkin, raw",vegetable
+QUINCE,168163,"Quinces, raw",vegetable
+RADICCHIO,168564,"Radicchio, raw",vegetable
+RADISH,169276,"Radishes, raw",vegetable
+RAMBUTAN,168167,"Rambutan, canned, syrup pack",vegetable
+RHUBARB,167758,"Rhubarb, raw",vegetable
+ROSEMARY,173473,"Rosemary, fresh",vegetable
+RUTABAGAS (SWEDE),168454,"Rutabagas, raw",vegetable
+SAGE,167694,"Sausage, turkey and pork, fresh, bulk, patty or link, cooked",vegetable
+SAPODILLO/NISPERO,167759,"Sapodilla, raw",vegetable
+SAPOTE,167760,"Sapote, mamey, raw",vegetable
+SAVORY,170936,"Spices, savory, ground",herb
+SOURSOP,167761,"Soursop, raw",vegetable
+SPINACH,168440,"New Zealand spinach, raw",vegetable
+SQUASH,168565,"Squash, zucchini, baby, raw",vegetable
+SUGAR APPLE,168175,"Sugar-apples, (sweetsop), raw",fruit
+SUNCHOKES (JERUSALEM ARTICHOKES),169236,"Jerusalem-artichokes, raw",vegetable
+SUNFLOWER SEEDS,168593,"Seeds, sunflower seed kernels, oil roasted, with salt added",nut
+SWEET POTATO/YAM/KUMARA,168482,"Sweet potato, raw, unprepared (Includes foods for USDA's Food Distribution Program)",vegetable
+TAMARIND,167763,"Tamarinds, raw",vegetable
+TANGELO,,"Not found in SR Legacy",vegetable
+TANGERINES/MANDARINS,169105,"Tangerines, (mandarin oranges), raw",fruit
+TARO ROOT (DASHEEN),169308,"Taro, raw",vegetable
+THYME,173470,"Thyme, fresh",vegetable
+TOMATOES,170457,"Tomatoes, red, ripe, raw, year round average",vegetable
+TURNIP,169818,"Prairie Turnips, raw (Northern Plains Indians)",vegetable
+WALNUTS,170187,"Nuts, walnuts, english",nut
+WATER CHESTNUTS,170066,"Waterchestnuts, chinese, (matai), raw",vegetable
+WATERCRESS,170068,"Watercress, raw",vegetable
+YUCA ROOT/CASSAVA/MANIOC,169985,"Cassava, raw",vegetable

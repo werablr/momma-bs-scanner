@@ -52,6 +52,11 @@ export const scannerMachine = setup({
       return event.barcode && event.barcode.length >= 8
     },
 
+    isValidPLU: ({ event }) => {
+      if (event.type !== 'PLU_ENTERED') return false
+      return event.plu_code && /^\d{4,5}$/.test(event.plu_code)
+    },
+
     // Context validation
     hasStorageLocation: ({ context }) => {
       return context.storage_location_id !== null
@@ -65,9 +70,17 @@ export const scannerMachine = setup({
       return context.product !== null
     },
 
+    hasMatches: ({ context }) => {
+      return context.matches !== null && context.matches.length > 0
+    },
+
     // Workflow type guards
     isBarcodeWorkflow: ({ context }) => {
       return context.mode === 'barcode'
+    },
+
+    isPLUWorkflow: ({ context }) => {
+      return context.mode === 'plu'
     },
   },
 
@@ -89,6 +102,14 @@ export const scannerMachine = setup({
       barcodeType: ({ event }) => {
         if (event.type !== 'BARCODE_DETECTED') return null
         return event.barcodeType
+      },
+    }),
+
+    // Store PLU code
+    storePLU: assign({
+      plu_code: ({ event }) => {
+        if (event.type !== 'PLU_ENTERED') return null
+        return event.plu_code
       },
     }),
 
@@ -133,6 +154,64 @@ export const scannerMachine = setup({
       ocr_confidence: ({ event }) => {
         if (event.type !== 'EXPIRATION_CAPTURED') return null
         return event.confidence
+      },
+    }),
+
+    // Store matches from PLU/Photo lookup (used in onDone transitions)
+    storeMatches: assign({
+      matches: ({ event }) => {
+        if (!('output' in event) || !event.output) return null
+        const output = event.output as any
+        return output.matches || null
+      },
+    }),
+
+    // Store quantity from match selection
+    storeQuantity: assign({
+      quantity: ({ event }) => {
+        if (event.type !== 'MATCH_SELECTED') return 1
+        return event.quantity || 1
+      },
+    }),
+
+    // Store product from match selection (overrides storeProduct for PLU/Photo)
+    storeProductFromMatch: assign({
+      product: ({ event }) => {
+        if (event.type !== 'MATCH_SELECTED') return null
+        return event.match
+      },
+    }),
+
+    // Auto-select single match (used when PLU lookup returns exactly one result)
+    autoSelectSingleMatch: assign({
+      product: ({ event }) => {
+        if (!('output' in event) || !event.output) return null
+        const output = event.output as any
+        if (output.matches && output.matches.length === 1) {
+          return output.matches[0]
+        }
+        return null
+      },
+      quantity: ({ event }) => {
+        // Default quantity to 1 for auto-selected PLU items
+        if (!('output' in event) || !event.output) return 1
+        const output = event.output as any
+        if (output.matches && output.matches.length === 1) {
+          return 1
+        }
+        return 1
+      },
+    }),
+
+    // Generate pseudo-barcode for PLU/Photo workflows
+    generatePseudoBarcode: assign({
+      barcode: ({ context }) => {
+        if (context.mode === 'plu') {
+          return `PLU-${context.plu_code}-${Date.now()}`
+        } else if (context.mode === 'photo') {
+          return `PHOTO-${Date.now()}`
+        }
+        return context.barcode
       },
     }),
 
@@ -307,6 +386,118 @@ export const scannerMachine = setup({
       return data as Step2Response
     }),
 
+    // PLU workflow - Lookup PLU code
+    lookupPLU: fromPromise(async ({ input }) => {
+      const { context } = input as { context: ScannerContext }
+
+      console.log('[lookupPLU] Looking up PLU code:', context.plu_code)
+
+      const { data, error } = await supabase.functions.invoke('lookup-plu', {
+        body: { pluCode: context.plu_code },
+      })
+
+      if (error) {
+        console.error('[lookupPLU] ❌ Error from edge function:', error)
+        throw error
+      }
+
+      if (!data) {
+        console.error('[lookupPLU] ❌ No data returned from lookup-plu')
+        throw new Error('No data returned from lookup-plu')
+      }
+
+      console.log('[lookupPLU] ✅ PLU lookup success:', data)
+      return data
+    }),
+
+    // PLU workflow - Create inventory item directly (no barcode API needed)
+    createPLUItem: fromPromise(async ({ input }) => {
+      const { context } = input as { context: ScannerContext }
+
+      console.log('[createPLUItem] Creating PLU inventory item...')
+      console.log('[createPLUItem] Product:', context.product)
+      console.log('[createPLUItem] Barcode:', context.barcode)
+      console.log('[createPLUItem] Storage location:', context.storage_location_id)
+
+      // Extract product data from match (USDA format)
+      const product = context.product as any // Match type from PLU lookup
+      const nutrition = product?.nutrition
+
+      // Get household_id from user_households table
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      console.log('[createPLUItem] Authenticated user:', user.id)
+
+      // Query user_households to get the correct household_id
+      const { data: userHouseholdData, error: householdError } = await supabase
+        .from('user_households')
+        .select('household_id')
+        .eq('user_id', user.id)
+        .single()
+
+      if (householdError || !userHouseholdData) {
+        console.error('[createPLUItem] ❌ Failed to get household_id:', householdError)
+        throw new Error('Failed to get user household')
+      }
+
+      const household_id = userHouseholdData.household_id
+      console.log('[createPLUItem] Using household_id:', household_id)
+
+      // Create inventory item directly using ONLY actual schema columns
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert({
+          household_id,
+          barcode: context.barcode, // PLU-{code}-{timestamp}
+          storage_location_id: context.storage_location_id,
+          food_name: product?.product_name || product?.description || 'Unknown PLU Item',
+          brand_name: product?.brands || null,
+          quantity: context.quantity || 1,
+          status: 'pending', // Will be set to active after review
+
+          // USDA nutrition data (actual column names from schema)
+          usda_calories: nutrition?.energy_kcal || null,
+          usda_protein: nutrition?.proteins || null,
+          usda_total_fat: nutrition?.fat || null,
+          usda_saturated_fat: nutrition?.saturated_fat || null,
+          usda_trans_fat: nutrition?.trans_fat || null,
+          usda_total_carbohydrate: nutrition?.carbohydrates || null,
+          usda_dietary_fiber: nutrition?.fiber || null,
+          usda_sugars: nutrition?.sugars || null,
+          usda_added_sugars: nutrition?.added_sugars || null,
+          usda_cholesterol: nutrition?.cholesterol || null,
+          usda_sodium: nutrition?.sodium || null,
+          usda_potassium: nutrition?.potassium || null,
+          usda_calcium: nutrition?.calcium || null,
+          usda_iron: nutrition?.iron || null,
+          usda_vitamin_d: nutrition?.vitamin_d || null,
+
+          // USDA metadata (actual column name from schema)
+          usda_fdc_id: product?.fdc_id || null,
+
+          // Serving info
+          serving_unit: nutrition?.serving_unit || null,
+
+          // Timestamps (schema has these)
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          scanned_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('[createPLUItem] ❌ Error creating item:', error)
+        throw error
+      }
+
+      console.log('[createPLUItem] ✅ PLU item created:', data)
+      return { item_id: data.id, success: true }
+    }),
+
     // Review actions
     updateStatus: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
@@ -453,9 +644,12 @@ export const scannerMachine = setup({
               target: '#scanner.scanning.barcode',
               actions: { type: 'setMode', params: { mode: 'barcode' } },
             },
-            // Phase 2+: Add other workflow entry points
+            START_PLU_ENTRY: {
+              target: '#scanner.scanning.plu',
+              actions: { type: 'setMode', params: { mode: 'plu' } },
+            },
+            // Phase 3+: Add other workflow entry points
             // START_PHOTO_SCAN: ...
-            // START_PLU_ENTRY: ...
             // START_MANUAL_ENTRY: ...
           },
         },
@@ -478,9 +672,20 @@ export const scannerMachine = setup({
             CANCEL: '#scanner.ready.idle',
           },
         },
-        // Phase 2+: Add other scanning modes
+
+        plu: {
+          on: {
+            PLU_ENTERED: {
+              target: '#scanner.processing.lookingUpPLU',
+              guard: 'isValidPLU',
+              actions: 'storePLU',
+            },
+            CANCEL: '#scanner.ready.idle',
+          },
+        },
+
+        // Phase 3+: Add other scanning modes
         // photo: ...
-        // plu: ...
         // manual: ...
       },
     },
@@ -493,14 +698,96 @@ export const scannerMachine = setup({
       entry: 'persistState',
 
       states: {
-        selectingLocation: {
+        // PLU workflow - Lookup PLU code
+        lookingUpPLU: {
+          invoke: {
+            src: 'lookupPLU',
+            input: ({ context }) => ({ context }),
+            onDone: [
+              {
+                // Single match - auto-select and skip selection screen
+                target: 'selectingLocation',
+                guard: ({ event }) => {
+                  const output = event.output as any
+                  return output && output.matches && output.matches.length === 1
+                },
+                actions: ['autoSelectSingleMatch', 'generatePseudoBarcode'],
+              },
+              {
+                // Multiple matches - show selection screen
+                target: 'selectingMatch',
+                guard: ({ event }) => {
+                  const output = event.output as any
+                  return output && output.matches && output.matches.length > 1
+                },
+                actions: 'storeMatches',
+              },
+              {
+                // No matches - error
+                target: '#scanner.error.noMatches',
+                guard: ({ event }) => {
+                  const output = event.output as any
+                  return !output || !output.matches || output.matches.length === 0
+                },
+                actions: 'storeError',
+              },
+            ],
+            onError: {
+              target: '#scanner.error.retryable',
+              actions: [
+                'storeError',
+                { type: 'setRetryState', params: { state: 'scanning.plu' } },
+              ],
+            },
+          },
+        },
+
+        // PLU/Photo workflow - Select match from list
+        selectingMatch: {
           on: {
-            LOCATION_SELECTED: {
-              target: 'callingBarcodeAPI',
-              guard: 'isBarcodeWorkflow',
-              actions: 'storeLocation',
+            MATCH_SELECTED: {
+              target: 'selectingLocation',
+              actions: ['storeProductFromMatch', 'storeQuantity', 'generatePseudoBarcode'],
             },
             CANCEL: '#scanner.ready.idle',
+          },
+        },
+
+        selectingLocation: {
+          on: {
+            LOCATION_SELECTED: [
+              {
+                target: 'callingBarcodeAPI',
+                guard: 'isBarcodeWorkflow',
+                actions: 'storeLocation',
+              },
+              {
+                target: 'creatingPLUItem',
+                guard: 'isPLUWorkflow',
+                actions: 'storeLocation',
+              },
+              // Phase 3+: Photo workflow will add uploadingPhoto state here
+            ],
+            CANCEL: '#scanner.ready.idle',
+          },
+        },
+
+        // PLU workflow - Create inventory item directly
+        creatingPLUItem: {
+          invoke: {
+            src: 'createPLUItem',
+            input: ({ context }) => ({ context }),
+            onDone: {
+              target: 'capturingExpiration',
+              actions: 'storeScanId',
+            },
+            onError: {
+              target: '#scanner.error.retryable',
+              actions: [
+                'storeError',
+                { type: 'setRetryState', params: { state: 'processing.selectingLocation' } },
+              ],
+            },
           },
         },
 
@@ -644,7 +931,12 @@ export const scannerMachine = setup({
         retryable: {
           on: {
             RETRY: [
-              // Phase 1: Barcode workflow retry states only
+              // PLU workflow retry states
+              {
+                target: '#scanner.scanning.plu',
+                guard: ({ context }) => context.retry_state === 'scanning.plu',
+              },
+              // Barcode workflow retry states
               {
                 target: '#scanner.processing.capturingExpiration',
                 guard: ({ context }) => context.retry_state === 'processing.capturingExpiration',
@@ -657,11 +949,10 @@ export const scannerMachine = setup({
               {
                 target: '#scanner.processing.selectingLocation',
               },
-              // Phase 2+: Add these when implemented
+              // Phase 3+: Add these when implemented
               // - processing.uploadingPhoto
               // - processing.callingPhotoAPI
               // - processing.identifyingWithAI
-              // - scanning.plu
               // - scanning.manual
             ],
             CANCEL: '#scanner.ready.idle',
