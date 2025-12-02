@@ -3,15 +3,15 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** December 2, 2025 - **PHASE 3: PLU Workflow 90% Complete**
+**Last Updated:** December 2, 2025 - **PHASE 3: PLU Workflow COMPLETE ✅**
 
 ---
 
 ## Current State
 
-### 🔄 PHASE 3 IN PROGRESS: PLU Workflow (Dec 1-2, 2025)
+### ✅ PHASE 3 COMPLETE: PLU Database & Workflow (Dec 2, 2025)
 
-**PLU Workflow (90% Complete):**
+**PLU Workflow (100% Complete):**
 - ✅ State machine integration (`machines/scanner.machine.ts`)
   - `lookupPLU` actor → calls `lookup-plu` edge function
   - `createPLUItem` actor → creates inventory item directly (no Step 1/Step 2)
@@ -19,20 +19,17 @@
 - ✅ PLU entry UI (`BarcodeScannerV2.tsx`)
   - PLU input screen with 4-5 digit validation
   - Match selection screen for multiple USDA results
-- ✅ `lookup-plu` edge function updated for direct FDC ID lookup (deployed)
+- ✅ `lookup-plu` edge function deployed (queries plu_codes table)
 - ✅ End-to-end tested: PLU 4011 (bananas) → item created successfully
 
-**BLOCKING: PLU Database Tech Debt**
-- Current: ~33 hardcoded PLU codes in edge function
-- Required: 1,547 IFPS standard PLU codes
-- **Solution:** Create `plu_codes` table in Supabase
-  - ✅ IFPS CSV with 1,547 PLU codes acquired
-  - ✅ 194 unique commodities identified
-  - ✅ FDC ID mapping verified: 142/144 commodities mapped via local USDA database
-  - ✅ Mapping file: `commodity_fdc_LOCAL_VERIFIED.csv`
-  - ⏳ **Awaiting Brian's approval** to proceed with migrations
-  - Pending: Migrations to create table + import data
-  - Pending: Update edge function to query table instead of hardcoded object
+**PLU Database (COMPLETE):**
+- ✅ **1,545 PLU codes** imported to Supabase `plu_codes` table
+- ✅ **ALL 20 IFPS columns** captured per "capture everything" philosophy
+- ✅ **1,235 PLU codes (79%)** have USDA nutrition mappings
+- ✅ **310 PLU codes (21%)** without USDA data (valid - not in SR Legacy)
+- ✅ Handles duplicate PLU codes (same code, different size/restrictions)
+- ✅ Edge function returns all variants for selection
+- ✅ RFC 4180 CSV parsing (handles multi-line quoted fields)
 
 ### ✅ PHASE 2 COMPLETE: XState State Machine (Nov 29, 2025)
 
