@@ -3,15 +3,30 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** December 2, 2025 - **PHASE 3: PLU Workflow COMPLETE ✅**
+**Last Updated:** December 3, 2025 - **PHASE 3: Device Testing COMPLETE ✅**
 
 ---
 
 ## Current State
 
-### ✅ PHASE 3 COMPLETE: PLU Database & Workflow (Dec 2, 2025)
+### ✅ PHASE 3 COMPLETE: Device Testing (Dec 3, 2025)
 
-**PLU Workflow (100% Complete):**
+**Barcode Workflow (Device Tested):**
+- ✅ 5 scans completed successfully on physical iPhone
+- ✅ Error handling validated (transient network error recovered via retry)
+- ✅ Multiple storage locations tested (Pantry, Freezer, Above Air Fryer, Above Freezer, Basket)
+- ✅ All items saved with `status: active`
+- ✅ State machine working correctly (scan → location → API → expiration → review → complete)
+- ✅ No critical bugs or crashes
+
+**Test Results (Dec 3, 2025):**
+1. ✅ Hormel Hot Chili (barcode: 0037600233521) - Pantry
+2. ✅ Libby's Vienna Sausage (barcode: 0039000086639) - Above Air Fryer (after retry)
+3. ✅ GOYA Refried Beans (barcode: 0041331029018) - Above Freezer
+4. ✅ Grandma's Original Molasses (barcode: 0072400711244) - Basket
+5. ✅ Crisco Vegetable Oil (barcode: 0196005708338) - Freezer
+
+**PLU Workflow (Implementation Complete, Device Testing Pending):**
 - ✅ State machine integration (`machines/scanner.machine.ts`)
   - `lookupPLU` actor → calls `lookup-plu` edge function
   - `createPLUItem` actor → creates inventory item directly (no Step 1/Step 2)
@@ -20,7 +35,7 @@
   - PLU input screen with 4-5 digit validation
   - Match selection screen for multiple USDA results
 - ✅ `lookup-plu` edge function deployed (queries plu_codes table)
-- ✅ End-to-end tested: PLU 4011 (bananas) → item created successfully
+- ⏳ Device testing: Pending (5 scans required)
 
 **PLU Database (COMPLETE):**
 - ✅ **1,545 PLU codes** imported to Supabase `plu_codes` table
