@@ -3,11 +3,84 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** December 3, 2025 - **PHASE 3: Device Testing COMPLETE ✅**
+**Last Updated:** December 4, 2025 (Added Claude Roles)
 
 ---
 
-## Current State
+## Roles
+
+**At conversation start, ask: "Am I Desktop Claude or Code Claude?"**
+
+### Brian (Human)
+- **Final approval authority** - All decisions require Brian's sign-off
+- **Product owner** - Defines requirements and priorities
+- **Human in the loop** - Can override any Claude decision
+- **Sets direction** - Decides what gets built and when
+
+### Desktop Claude (Supervisor)
+- **Controls optempo** - Sets pace, decides when to proceed
+- **Provides guardrails** - Enforces philosophy, prevents deviation
+- **Reviews work** - Validates Code Claude's output before approval
+- **Makes go/no-go decisions** - Approves phase transitions
+- **Updates documentation** - Maintains HANDOFF.md files
+- **Does NOT write code** - Only reviews, directs, and documents
+- **Reports to Brian** - Escalates decisions requiring human judgment
+
+### Code Claude (Executor)
+- **Writes code** - All implementation work
+- **Runs tests** - Executes test plans, reports results
+- **Follows instructions** - Executes tasks as directed by Desktop Claude
+- **Reports status** - Provides detailed results after each action
+- **Does NOT make architectural decisions** - Proposes, doesn't decide
+- **Reports to Desktop Claude** - Escalates blockers and questions
+
+**Code Claude is NOT a blind follower:**
+- **Finds gaps** - Actively looks for missing requirements, edge cases, incomplete specs
+- **Catches bugs** - Flags issues in existing code or proposed changes
+- **Spots conflicts** - Identifies contradictions in requirements or design
+- **Guards philosophy** - Calls out deviations from Core Tenets
+- **Can pause production** - Has authority to stop and discuss if something feels wrong
+- **Always asks questions** - Never proceeds with uncertainty; clarification is expected
+
+---
+
+## Dev Server Policy (Added December 4, 2025)
+
+**NEVER use `run_in_background: true` for `npx expo start`**
+
+**Rationale:** Background expo processes become orphaned, are uncontrollable, respawn indefinitely, and block ports permanently.
+
+**Correct Workflow:**
+1. Brian starts dev server via **Expo Orbit** (GUI app)
+2. Server runs in dedicated terminal or Expo Orbit manages it
+3. Code Claude queries server status if needed
+4. Code Claude **NEVER** starts expo server autonomously
+
+**If dev server is needed for testing:**
+- Code Claude asks Brian: "Please start the dev server via Expo Orbit"
+- Wait for confirmation before proceeding with tests
+
+**Emergency Cleanup (if background processes are found):**
+```bash
+# Find launchd services
+find ~/Library/LaunchAgents -name "*expo*" -o -name "*momma*"
+
+# Unload service
+launchctl unload <path-to-plist>
+
+# Remove plist
+rm <path-to-plist>
+
+# Kill orphaned processes
+pkill -f "expo start"
+
+# Verify port 8081 is free
+lsof -i :8081 || echo "Port 8081 is free"
+```
+
+---
+
+## Current State - PHASE 3: Device Testing COMPLETE ✅
 
 ### ✅ PHASE 3 COMPLETE: Device Testing (Dec 3, 2025)
 
