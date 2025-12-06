@@ -51,13 +51,13 @@
 **Rationale:** Background expo processes become orphaned, are uncontrollable, respawn indefinitely, and block ports permanently.
 
 **Correct Workflow:**
-1. Brian starts dev server via **Expo Orbit** (GUI app)
-2. Server runs in dedicated terminal or Expo Orbit manages it
+1. Brian manages dev server via **Lingon Pro** (launchd service manager)
+2. Server runs as controlled launchd service with proper lifecycle management
 3. Code Claude queries server status if needed
 4. Code Claude **NEVER** starts expo server autonomously
 
 **If dev server is needed for testing:**
-- Code Claude asks Brian: "Please start the dev server via Expo Orbit"
+- Code Claude asks Brian: "Please start the dev server via Lingon Pro"
 - Wait for confirmation before proceeding with tests
 
 **Emergency Cleanup (if background processes are found):**
