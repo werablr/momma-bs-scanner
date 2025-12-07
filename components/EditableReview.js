@@ -51,6 +51,8 @@ export default function EditableReview({
         volume_unit: productData.volume_unit || '',
         serving_qty: productData.serving_qty?.toString() || '',
         serving_unit: productData.serving_unit || '',
+        quantity: productData.quantity?.toString() || '1',
+        quantity_unit: productData.quantity_unit || 'each',
       });
       
       // Apply volume corrections for Campbell's soup and other known issues\n      const correctedData = correctVolume(productData);\n      \n      if (correctedData.volume_corrected) {\n        setEditedData(prev => ({\n          ...prev,\n          volume_amount: correctedData.volume_amount.toString(),\n          volume_unit: correctedData.volume_unit,\n          package_description: correctedData.package_description\n        }));\n      }\n      \n      validateData(correctedData.volume_corrected ? correctedData : productData);
@@ -169,6 +171,8 @@ export default function EditableReview({
       ...editedData,
       volume_amount: parseFloat(editedData.volume_amount) || productData.volume_amount,
       serving_qty: parseFloat(editedData.serving_qty) || productData.serving_qty,
+      quantity: parseFloat(editedData.quantity) || 1,
+      quantity_unit: editedData.quantity_unit,
       manual_corrections: getChangedFields(),
       reviewed_by_user: true
     };
@@ -291,6 +295,52 @@ export default function EditableReview({
                   onChangeText={(value) => handleFieldChange('package_description', value)}
                   placeholder="e.g., 1 can (10.5 oz)"
                 />
+              </View>
+
+              <View style={styles.quantitySection}>
+                <Text style={styles.sectionTitle}>Quantity</Text>
+
+                <View style={styles.quantityRow}>
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={editedData.quantity}
+                    onChangeText={(value) => handleFieldChange('quantity', value)}
+                    keyboardType={editedData.quantity_unit === 'each' ? 'number-pad' : 'decimal-pad'}
+                    placeholder="1"
+                  />
+
+                  <View style={styles.unitPicker}>
+                    {['each', 'lb', 'oz'].map((unit) => (
+                      <TouchableOpacity
+                        key={unit}
+                        style={[
+                          styles.unitOption,
+                          editedData.quantity_unit === unit && styles.unitOptionSelected
+                        ]}
+                        onPress={() => handleFieldChange('quantity_unit', unit)}
+                      >
+                        <Text style={[
+                          styles.unitOptionText,
+                          editedData.quantity_unit === unit && styles.unitOptionTextSelected
+                        ]}>
+                          {unit}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.quickQuantity}>
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <TouchableOpacity
+                      key={num}
+                      style={styles.quickQuantityButton}
+                      onPress={() => handleFieldChange('quantity', num.toString())}
+                    >
+                      <Text style={styles.quickQuantityText}>{num}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               <DetailRow
@@ -790,5 +840,66 @@ const styles = StyleSheet.create({
   pickerCancelText: {
     color: '#007AFF',
     fontSize: 16,
+  },
+  quantitySection: {
+    marginBottom: 15,
+  },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+    marginBottom: 10,
+  },
+  quantityInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 20,
+    fontWeight: 'bold',
+    width: 80,
+    textAlign: 'center',
+    backgroundColor: '#f9f9f9',
+  },
+  unitPicker: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  unitOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#f9f9f9',
+  },
+  unitOptionSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  unitOptionText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  unitOptionTextSelected: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  quickQuantity: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickQuantityButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickQuantityText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
   },
 });
