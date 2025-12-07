@@ -540,6 +540,78 @@ SELECT cron.schedule(
 
 ---
 
+## Automated Dev Server (Lingon Pro) - December 7, 2025
+
+### Schedule
+- **Starts**: Every day at 2:00 AM
+- **Stops**: Every day at 9:40 PM
+
+### Files
+1. `/Users/macmini/scripts/start-scanner-expo.sh` - Start script
+2. `~/Library/LaunchAgents/com.macmini.scanner.dev.start.plist` - Start job
+3. `~/Library/LaunchAgents/com.macmini.scanner.dev.stop.plist` - Stop job
+
+### Manual Commands
+```bash
+# Start/stop server
+launchctl start com.macmini.scanner.dev.start
+launchctl start com.macmini.scanner.dev.stop
+
+# Check status
+ps aux | grep "expo start"
+lsof -i :8081
+launchctl list | grep scanner
+
+# View logs
+tail -50 ~/expo-from-lingon.log
+```
+
+### Network
+- Mac mini IP: `192.168.0.211`
+- Port: `8081`
+- Flags: `--dev-client --host lan`
+
+---
+
+## CURRENT PROBLEM: App Stuck on Loading Screen (December 7, 2025)
+
+### Symptoms
+- Dev server running correctly (confirmed via logs)
+- JavaScript bundle loads successfully (1884 modules in 595ms)
+- User authentication works (`werablr@gmail.com`)
+- App gets stuck on loading screen, never proceeds
+
+### Evidence from Logs
+```
+iOS Bundled 595ms node_modules/expo-router/entry.js (1884 modules)
+LOG  [HomeScreen] useEffect triggered, user: not logged in
+LOG  🔐 Auth state changed: TOKEN_REFRESHED werablr@gmail.com
+LOG  🏠 Fetching household for user: a4e98888-9537-442e-add6-e25815c01495
+LOG  [HomeScreen] useEffect triggered, user: logged in
+LOG  [HomeScreen] Loading storage locations from Supabase...
+LOG  [HomeScreen] Household: null
+```
+
+### Analysis
+1. User authenticates successfully: `a4e98888-9537-442e-add6-e25815c01495`
+2. App fetches household → returns `null`
+3. App does not handle null household case
+4. Loading state never exits
+
+### Required Troubleshooting
+1. **Database**: Verify household record exists for user `a4e98888-9537-442e-add6-e25815c01495`
+2. **RLS Policies**: Check if policies block household query
+3. **Code**: Review HomeScreen household fetching logic
+4. **Error Handling**: Add fallback for null household (create/join flow or error message)
+
+### Related Files
+- HomeScreen component (household fetching)
+- Supabase household queries/hooks
+- Auth context/hooks
+- RLS policies
+
+---
+
 **Handoff Status:** Complete and Verified
 **Code Quality:** B (functional but needs refactor)
 **Data Integrity:** C (pending items + orphaned photos need fixes)
@@ -547,3 +619,4 @@ SELECT cron.schedule(
 **Security:** A (RLS, JWT, service role correct)
 **Last Audit:** November 28, 2025
 **Next Review:** After P0/P1 fixes (December 15, 2025)
+**Current Blocker:** App stuck on loading due to null household (December 7, 2025)
