@@ -41,33 +41,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadHousehold(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
+    let isMounted = true;
 
-    // Listen for auth changes
+    const initAuth = async () => {
+      try {
+        // Get initial session
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!isMounted) return;
+
+        if (session?.user) {
+          setUser(session.user);
+          await loadHouseholdInternal(session.user.id);
+        }
+      } catch (error) {
+        console.error('❌ Auth init failed:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Internal version that doesn't set loading
+    const loadHouseholdInternal = async (userId: string) => {
+      try {
+        setError(null);
+        console.log('🏠 Fetching household for user:', userId);
+        const householdData = await scannerAPI.getUserHousehold(userId);
+        console.log('✅ User household fetched:', householdData);
+        const household = Array.isArray(householdData) ? householdData[0] : householdData;
+        if (isMounted) {
+          setHousehold(household || null);
+        }
+      } catch (error: any) {
+        console.error('❌ Failed to load household:', error);
+        if (isMounted) {
+          setError('Failed to load household data');
+        }
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth changes (sign in/out)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 Auth state changed:', event, session?.user?.email);
 
-      if (session?.user) {
+      // Only handle explicit sign in/out, not token refresh
+      if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
-        await loadHousehold(session.user.id);
-      } else {
+        setLoading(true);
+        await loadHouseholdInternal(session.user.id);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setHousehold(null);
-        setLoading(false);
       }
+      // Ignore TOKEN_REFRESHED - we already have the data
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadHousehold = async (userId: string): Promise<void> => {
