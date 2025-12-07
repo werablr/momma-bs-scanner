@@ -573,42 +573,47 @@ tail -50 ~/expo-from-lingon.log
 
 ---
 
-## CURRENT PROBLEM: App Stuck on Loading Screen (December 7, 2025)
+## Recent Updates (December 7, 2025)
 
-### Symptoms
-- Dev server running correctly (confirmed via logs)
-- JavaScript bundle loads successfully (1884 modules in 595ms)
-- User authentication works (`werablr@gmail.com`)
-- App gets stuck on loading screen, never proceeds
+### ✅ FIXED: Race Condition in AuthContext (Commit 6ad9da7)
 
-### Evidence from Logs
-```
-iOS Bundled 595ms node_modules/expo-router/entry.js (1884 modules)
-LOG  [HomeScreen] useEffect triggered, user: not logged in
-LOG  🔐 Auth state changed: TOKEN_REFRESHED werablr@gmail.com
-LOG  🏠 Fetching household for user: a4e98888-9537-442e-add6-e25815c01495
-LOG  [HomeScreen] useEffect triggered, user: logged in
-LOG  [HomeScreen] Loading storage locations from Supabase...
-LOG  [HomeScreen] Household: null
-```
+**Problem:** App stuck on loading screen due to race condition
+- `setUser()` triggered re-render immediately
+- `loadHousehold()` was async and completed after loading state was set to false
+- HomeScreen rendered with `user = valid`, `household = null`, `loading = false`
+- App never exited loading state
 
-### Analysis
-1. User authenticates successfully: `a4e98888-9537-442e-add6-e25815c01495`
-2. App fetches household → returns `null`
-3. App does not handle null household case
-4. Loading state never exits
+**Solution:**
+- Added `isMounted` flag to prevent state updates after unmount
+- Don't set `loading = false` until BOTH user AND household are loaded
+- Ignore `TOKEN_REFRESHED` events (don't need to reload household)
+- Only reload on explicit `SIGNED_IN` / `SIGNED_OUT` events
+- Created internal `loadHouseholdInternal` to avoid duplicate loading logic
 
-### Required Troubleshooting
-1. **Database**: Verify household record exists for user `a4e98888-9537-442e-add6-e25815c01495`
-2. **RLS Policies**: Check if policies block household query
-3. **Code**: Review HomeScreen household fetching logic
-4. **Error Handling**: Add fallback for null household (create/join flow or error message)
+**Files Changed:** `contexts/AuthContext.tsx`
 
-### Related Files
-- HomeScreen component (household fetching)
-- Supabase household queries/hooks
-- Auth context/hooks
-- RLS policies
+### ✅ ADDED: Quantity + Unit Input to Review Screen (Commit eb1884c)
+
+**Features:**
+- Quantity input field with dynamic keyboard (number-pad for 'each', decimal-pad for 'lb'/'oz')
+- Unit picker buttons: each / lb / oz
+- Quick quantity buttons: 1, 2, 3, 4, 5
+- Defaults: quantity=1, unit='each'
+
+**Files Changed:**
+- `components/EditableReview.js` - Added quantity section UI and logic
+- `supabase/migrations/20251207000000_add_quantity_unit.sql` - Database migration
+
+**Database:**
+- Added `quantity_unit` column (TEXT, default 'each')
+- Existing `quantity` column already exists (numeric)
+
+### ✅ FIXED: Product Data Field Name Fallbacks (Commit cd7c290)
+
+**Problem:** Different API sources return different field names
+**Solution:** Added fallbacks in EditableReview:
+- `name || product_name || food_name`
+- `brand_name || brand || brands`
 
 ---
 
@@ -618,5 +623,5 @@ LOG  [HomeScreen] Household: null
 **Performance:** B- (sequential APIs slow scans)
 **Security:** A (RLS, JWT, service role correct)
 **Last Audit:** November 28, 2025
+**Last Updated:** December 7, 2025 (AuthContext race condition fixed, quantity input added)
 **Next Review:** After P0/P1 fixes (December 15, 2025)
-**Current Blocker:** App stuck on loading due to null household (December 7, 2025)
