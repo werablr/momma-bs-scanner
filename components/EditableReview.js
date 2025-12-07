@@ -42,8 +42,8 @@ export default function EditableReview({
   useEffect(() => {
     if (productData) {
       setEditedData({
-        name: productData.name || '',
-        brand_name: productData.brand_name || productData.brand || '',
+        name: productData.name || productData.product_name || productData.food_name || '',
+        brand_name: productData.brand_name || productData.brand || productData.brands || '',
         suggested_category: productData.suggested_category || '',
         package_description: productData.package_description || '',
         expiration_date: productData.expiration_date || '',
