@@ -68,11 +68,11 @@
       "hostType": "lan"
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "9cc1c474-3265-4a96-9bba-a6ceb17e0e4a"
-      },
-      "router": {}
+        "projectId": "3b590491-bf97-4fc6-bcc6-038cc41e0dcb"
+      }
     },
-    "owner": "werablr"
+    "owner": "momma-bs-household"
   }
 }

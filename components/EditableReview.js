@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { STORAGE_LOCATIONS } from '../utils/constants';
 import { correctVolume, getVolumeSuggestion } from '../utils/volumeCorrection';
 
@@ -51,7 +52,8 @@ export default function EditableReview({
         volume_unit: productData.volume_unit || '',
         serving_qty: productData.serving_qty?.toString() || '',
         serving_unit: productData.serving_unit || '',
-        quantity: productData.quantity?.toString() || '1',
+        quantity: productData.quantity || 1,
+        quantity_oz: productData.quantity_oz || 0,
         quantity_unit: productData.quantity_unit || 'each',
       });
       
@@ -171,12 +173,13 @@ export default function EditableReview({
       ...editedData,
       volume_amount: parseFloat(editedData.volume_amount) || productData.volume_amount,
       serving_qty: parseFloat(editedData.serving_qty) || productData.serving_qty,
-      quantity: parseFloat(editedData.quantity) || 1,
+      quantity: editedData.quantity,
+      quantity_oz: editedData.quantity_unit === 'weight' ? editedData.quantity_oz : 0,
       quantity_unit: editedData.quantity_unit,
       manual_corrections: getChangedFields(),
       reviewed_by_user: true
     };
-    
+
     onApprove(correctedData);
   };
 
@@ -300,47 +303,89 @@ export default function EditableReview({
               <View style={styles.quantitySection}>
                 <Text style={styles.sectionTitle}>Quantity</Text>
 
-                <View style={styles.quantityRow}>
-                  <TextInput
-                    style={styles.quantityInput}
-                    value={editedData.quantity}
-                    onChangeText={(value) => handleFieldChange('quantity', value)}
-                    keyboardType={editedData.quantity_unit === 'each' ? 'number-pad' : 'decimal-pad'}
-                    placeholder="1"
-                  />
-
-                  <View style={styles.unitPicker}>
-                    {['each', 'lb', 'oz'].map((unit) => (
-                      <TouchableOpacity
-                        key={unit}
-                        style={[
-                          styles.unitOption,
-                          editedData.quantity_unit === unit && styles.unitOptionSelected
-                        ]}
-                        onPress={() => handleFieldChange('quantity_unit', unit)}
-                      >
-                        <Text style={[
-                          styles.unitOptionText,
-                          editedData.quantity_unit === unit && styles.unitOptionTextSelected
-                        ]}>
-                          {unit}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                {/* Mode Toggle: each | weight */}
+                <View style={styles.modeToggle}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeButton,
+                      styles.modeButtonLeft,
+                      editedData.quantity_unit === 'each' && styles.modeButtonSelected
+                    ]}
+                    onPress={() => {
+                      handleFieldChange('quantity_unit', 'each');
+                      handleFieldChange('quantity_oz', 0);
+                    }}
+                  >
+                    <Text style={[
+                      styles.modeButtonText,
+                      editedData.quantity_unit === 'each' && styles.modeButtonTextSelected
+                    ]}>
+                      each
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeButton,
+                      styles.modeButtonRight,
+                      editedData.quantity_unit === 'weight' && styles.modeButtonSelected
+                    ]}
+                    onPress={() => handleFieldChange('quantity_unit', 'weight')}
+                  >
+                    <Text style={[
+                      styles.modeButtonText,
+                      editedData.quantity_unit === 'weight' && styles.modeButtonTextSelected
+                    ]}>
+                      weight
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
-                <View style={styles.quickQuantity}>
-                  {[1, 2, 3, 4, 5].map((num) => (
-                    <TouchableOpacity
-                      key={num}
-                      style={styles.quickQuantityButton}
-                      onPress={() => handleFieldChange('quantity', num.toString())}
+                {/* Scroll Pickers */}
+                {editedData.quantity_unit === 'each' ? (
+                  // Mode 1: Single picker for "each" (1-64)
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={editedData.quantity}
+                      onValueChange={(value) => handleFieldChange('quantity', value)}
+                      style={styles.picker}
+                      itemStyle={styles.pickerItem}
                     >
-                      <Text style={styles.quickQuantityText}>{num}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      {Array.from({ length: 64 }, (_, i) => i + 1).map(num => (
+                        <Picker.Item key={num} label={num.toString()} value={num} />
+                      ))}
+                    </Picker>
+                  </View>
+                ) : (
+                  // Mode 2: Two pickers for "weight" (lb + oz)
+                  <View style={styles.weightPickerContainer}>
+                    <View style={styles.weightPickerColumn}>
+                      <Text style={styles.weightPickerLabel}>lb</Text>
+                      <Picker
+                        selectedValue={editedData.quantity}
+                        onValueChange={(value) => handleFieldChange('quantity', value)}
+                        style={styles.weightPicker}
+                        itemStyle={styles.pickerItem}
+                      >
+                        {Array.from({ length: 65 }, (_, i) => i).map(num => (
+                          <Picker.Item key={num} label={num.toString()} value={num} />
+                        ))}
+                      </Picker>
+                    </View>
+                    <View style={styles.weightPickerColumn}>
+                      <Text style={styles.weightPickerLabel}>oz</Text>
+                      <Picker
+                        selectedValue={editedData.quantity_oz}
+                        onValueChange={(value) => handleFieldChange('quantity_oz', value)}
+                        style={styles.weightPicker}
+                        itemStyle={styles.pickerItem}
+                      >
+                        {Array.from({ length: 16 }, (_, i) => i).map(num => (
+                          <Picker.Item key={num} label={num.toString()} value={num} />
+                        ))}
+                      </Picker>
+                    </View>
+                  </View>
+                )}
               </View>
 
               <DetailRow
@@ -844,62 +889,79 @@ const styles = StyleSheet.create({
   quantitySection: {
     marginBottom: 15,
   },
-  quantityRow: {
+  // Mode Toggle Styles
+  modeToggle: {
     flexDirection: 'row',
+    marginBottom: 15,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 12,
     alignItems: 'center',
-    gap: 15,
-    marginBottom: 10,
-  },
-  quantityInput: {
+    backgroundColor: '#f0f0f0',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 20,
-    fontWeight: 'bold',
-    width: 80,
-    textAlign: 'center',
-    backgroundColor: '#f9f9f9',
   },
-  unitPicker: {
-    flexDirection: 'row',
-    gap: 8,
+  modeButtonLeft: {
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+    borderRightWidth: 0.5,
   },
-  unitOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#f9f9f9',
+  modeButtonRight: {
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    borderLeftWidth: 0.5,
   },
-  unitOptionSelected: {
+  modeButtonSelected: {
     backgroundColor: '#007AFF',
     borderColor: '#007AFF',
   },
-  unitOptionText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  unitOptionTextSelected: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  quickQuantity: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  quickQuantityButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickQuantityText: {
+  modeButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#666',
+  },
+  modeButtonTextSelected: {
+    color: 'white',
+  },
+  // Picker Container Styles
+  pickerContainer: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 180,
+  },
+  pickerItem: {
+    fontSize: 24,
+    height: 180,
+  },
+  // Weight Picker Styles
+  weightPickerContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  weightPickerColumn: {
+    flex: 1,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    overflow: 'hidden',
+  },
+  weightPickerLabel: {
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    paddingTop: 8,
+    paddingBottom: 4,
+    backgroundColor: '#e8e8e8',
+  },
+  weightPicker: {
+    height: 160,
   },
 });

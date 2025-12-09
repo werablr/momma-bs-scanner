@@ -3,7 +3,7 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** December 4, 2025 (Added Claude Roles)
+**Last Updated:** December 9, 2025 (Quantity Input Redesign + EAS Org Migration)
 
 ---
 
@@ -615,6 +615,36 @@ tail -50 ~/expo-from-lingon.log
 - `name || product_name || food_name`
 - `brand_name || brand || brands`
 
+### ✅ NEW: Quantity Input Redesign (December 9, 2025)
+
+**UI Changes (EditableReview.js):**
+- Replaced text input with native scroll pickers using `@react-native-picker/picker`
+- Mode toggle: `each` | `weight` buttons
+- **Each mode**: Single scroll picker (range 1-64 items)
+- **Weight mode**: Dual scroll pickers (lb: 0-64, oz: 0-15)
+
+**Database Fields:**
+- `quantity` (integer): Count for "each" mode, pounds for "weight" mode
+- `quantity_oz` (integer): Ounces portion (0-15) for "weight" mode
+- `quantity_unit` (text): 'each' or 'weight'
+
+**Save Logic:**
+- Each mode: `quantity = selected value`, `quantity_oz = 0`, `quantity_unit = 'each'`
+- Weight mode: `quantity = lb value`, `quantity_oz = oz value`, `quantity_unit = 'weight'`
+
+**Package Added:** `@react-native-picker/picker` (native module, requires EAS rebuild)
+
+### ✅ EAS Organization Migration (December 9, 2025)
+
+**Changed (app.json):**
+- Owner: `werablr` → `momma-bs-household`
+- Removed old `projectId` (will regenerate on next build)
+- **Reason**: Move to organization with paid EAS plan
+
+**Next Build:**
+- EAS will prompt to link project to `momma-bs-household` org
+- New projectId will be generated and saved to app.json
+
 ---
 
 **Handoff Status:** Complete and Verified
@@ -623,5 +653,5 @@ tail -50 ~/expo-from-lingon.log
 **Performance:** B- (sequential APIs slow scans)
 **Security:** A (RLS, JWT, service role correct)
 **Last Audit:** November 28, 2025
-**Last Updated:** December 7, 2025 (AuthContext race condition fixed, quantity input added)
+**Last Updated:** December 9, 2025 (Quantity input redesign + EAS org migration)
 **Next Review:** After P0/P1 fixes (December 15, 2025)
