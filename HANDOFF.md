@@ -3,7 +3,7 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** December 9, 2025 (Quantity Input Redesign + EAS Org Migration)
+**Last Updated:** December 12, 2025 (Associated Domains setup)
 
 ---
 
@@ -645,6 +645,28 @@ tail -50 ~/expo-from-lingon.log
 - EAS will prompt to link project to `momma-bs-household` org
 - New projectId will be generated and saved to app.json
 
+### ✅ Associated Domains Setup (December 12, 2025)
+
+**Purpose:** Enable 1Password autofill for Scanner app login
+**Domain:** mommabshousehold.com
+**Association file:** https://mommabshousehold.com/.well-known/apple-app-site-association
+
+**Status:** Website deployed, association file verified ✅
+
+**Pending app.json changes** (add under `expo.ios`):
+```json
+"associatedDomains": [
+  "webcredentials:mommabshousehold.com",
+  "applinks:mommabshousehold.com"
+]
+```
+
+**Requires:** EAS rebuild after app.json changes
+
+**What This Enables:**
+- 1Password autofill in Scanner app login screen
+- Universal Links (deep linking from web to app)
+
 ---
 
 **Handoff Status:** Complete and Verified
@@ -653,5 +675,5 @@ tail -50 ~/expo-from-lingon.log
 **Performance:** B- (sequential APIs slow scans)
 **Security:** A (RLS, JWT, service role correct)
 **Last Audit:** November 28, 2025
-**Last Updated:** December 9, 2025 (Quantity input redesign + EAS org migration)
+**Last Updated:** December 12, 2025 (Associated Domains setup)
 **Next Review:** After P0/P1 fixes (December 15, 2025)
