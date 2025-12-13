@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import BarcodeScanner from '../../components/BarcodeScanner';
-import BarcodeScannerV2 from '../../components/BarcodeScannerV2';
 import ScannerErrorBoundary from '../../components/ScannerErrorBoundary';
 import AuthScreen from '../../components/AuthScreen';
 import { useAuth } from '../../contexts/AuthContext';
-import scannerAPI from '../../services/scannerAPI';
-import { USE_STATE_MACHINE } from '../../utils/featureFlags';
 import { supabase } from '../../lib/supabase';
 
 export default function HomeScreen() {
@@ -143,14 +140,10 @@ export default function HomeScreen() {
         </View>
       ) : (
         <ScannerErrorBoundary>
-          {USE_STATE_MACHINE ? (
-            <BarcodeScannerV2
-              storageLocations={storageLocations}
-              onProductScanned={handleProductScanned}
-            />
-          ) : (
-            <BarcodeScanner onProductScanned={handleProductScanned} />
-          )}
+          <BarcodeScanner
+            storageLocations={storageLocations}
+            onProductScanned={handleProductScanned}
+          />
         </ScannerErrorBoundary>
       )}
     </View>

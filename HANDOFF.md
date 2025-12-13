@@ -90,7 +90,7 @@
   - `lookupPLU` actor → calls `lookup-plu` edge function
   - `createPLUItem` actor → creates inventory item directly (no Step 1/Step 2)
   - Auto-select single match, selection UI for multiple matches
-- ✅ PLU entry UI (`BarcodeScannerV2.tsx`)
+- ✅ PLU entry UI (`BarcodeScanner.tsx`)
   - PLU input screen with 4-5 digit validation
   - Match selection screen for multiple USDA results
 - ✅ `lookup-plu` edge function deployed (queries plu_codes table)
@@ -107,19 +107,15 @@
 
 ### ✅ PHASE 2 COMPLETE: XState State Machine (Nov 29, 2025)
 
-**New Scanner (BarcodeScannerV2):**
+**Scanner (BarcodeScanner.tsx):**
 - ✅ Zero useState for workflow state (replaced 21 hooks with single state machine)
 - ✅ XState v5 with 19/19 passing tests
 - ✅ Real Supabase API integration (Step 1, Step 2, finalization)
 - ✅ End-to-end tested on device (barcode workflow)
 - ✅ Error handling (retry/cancel with cleanup)
 - ✅ Crash recovery (interrupted state with resume/discard)
-- ✅ Feature flag for safe rollout (`USE_STATE_MACHINE = __DEV__`)
 - ✅ Comprehensive logging for debugging
-
-**Legacy Scanner (BarcodeScanner.js):**
-- Still available when `USE_STATE_MACHINE = false`
-- Will be removed after device testing confirms V2 stability
+- ✅ **Legacy BarcodeScanner.js removed December 13, 2025**
 
 ### Working ✅
 - Authentication & RLS (secure login, household-based isolation)
@@ -361,28 +357,27 @@ supabase functions deploy lookup-plu
 - ✅ Refactor to XState v5 patterns (inline guards for invoke completions)
 - ✅ Create React Native mocks for Jest testing
 
-#### Phase 2: UI Integration 🟡 IN PROGRESS (Dec 2025)
-- 🟡 **Step 1: Create BarcodeScannerV2 skeleton** - IN PROGRESS
-  - Created BarcodeScannerV2.tsx with useMachine integration
-  - Zero useState hooks for workflow state
-  - All UI derived from state.matches()
-  - Feature flag: USE_STATE_MACHINE = __DEV__
-- ⏳ Step 2: Camera flow (permissions, barcode detection)
-- ⏳ Step 3: Processing flow (location, expiration, review)
-- ⏳ Step 4: Error & complete states
-- ⏳ Step 5: Device testing and verification
+#### Phase 2: UI Integration ✅ COMPLETE (December 13, 2025)
+- ✅ Created BarcodeScanner.tsx with useMachine integration
+- ✅ Zero useState hooks for workflow state
+- ✅ All UI derived from state.matches()
+- ✅ Camera flow (permissions, barcode detection)
+- ✅ Processing flow (location, expiration, review)
+- ✅ Error & complete states
+- ✅ Device testing and verification complete
+- ✅ **Legacy BarcodeScanner.js removed** (1,294 lines, 21 useState hooks)
+- ✅ **Feature flag removed** (state machine now always active)
 
-#### Phase 3: Additional Workflows (Deferred to Week 5+)
-- PLU workflow
-- Photo workflow
-- Manual entry workflow
-- Crash recovery
+#### Phase 3: Additional Workflows ✅ COMPLETE
+- ✅ PLU workflow (implemented and tested)
+- ⏳ Photo workflow (deferred)
+- ⏳ Manual entry workflow (deferred)
+- ✅ Crash recovery (implemented)
 
 **Files:**
 - machines/scanner.machine.ts (687 lines, tested)
 - machines/__tests__/scanner.machine.test.ts (709 lines, 19 tests)
-- components/BarcodeScannerV2.tsx (NEW - Phase 2)
-- utils/featureFlags.ts (NEW)
+- components/BarcodeScanner.tsx (XState-based, production)
 
 ### **Deferred: P3-P5 (High Effort, Low Urgency)**
 - P5: Import IFPS PLU database (Medium effort)
