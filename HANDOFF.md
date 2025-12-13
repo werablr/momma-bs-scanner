@@ -44,39 +44,25 @@
 
 ---
 
-## Dev Server Policy (Added December 4, 2025)
+## Dev Server Policy (Updated December 13, 2025)
 
-**NEVER use `run_in_background: true` for `npx expo start`**
+**Dev servers are managed via DevDash** - a native macOS app built in Xcode.
 
-**Rationale:** Background expo processes become orphaned, are uncontrollable, respawn indefinitely, and block ports permanently.
+**Location:** `/Users/macmini/Desktop/DevDash/`
 
-**Correct Workflow:**
-1. Brian manages dev server via **Lingon Pro** (launchd service manager)
-2. Server runs as controlled launchd service with proper lifecycle management
-3. Code Claude queries server status if needed
-4. Code Claude **NEVER** starts expo server autonomously
+**Port Assignment:** Scanner runs on port **8082**
 
-**If dev server is needed for testing:**
-- Code Claude asks Brian: "Please start the dev server via Lingon Pro"
+**Code Claude Rules:**
+- **NEVER** start dev servers autonomously
+- **NEVER** use `run_in_background: true` for any dev server
+- If dev server is needed, ask Brian: "Please start the Scanner dev server via DevDash"
 - Wait for confirmation before proceeding with tests
 
-**Emergency Cleanup (if background processes are found):**
-```bash
-# Find launchd services
-find ~/Library/LaunchAgents -name "*expo*" -o -name "*momma*"
-
-# Unload service
-launchctl unload <path-to-plist>
-
-# Remove plist
-rm <path-to-plist>
-
-# Kill orphaned processes
-pkill -f "expo start"
-
-# Verify port 8081 is free
-lsof -i :8081 || echo "Port 8081 is free"
-```
+**DevDash Features:**
+- Start/Stop/Force Start/Restart controls
+- Health probes (PID, Port, HTTP, Metro)
+- Process group management (no orphaned processes)
+- Live log streaming
 
 ---
 
@@ -540,36 +526,16 @@ SELECT cron.schedule(
 
 ---
 
-## Automated Dev Server (Lingon Pro) - December 7, 2025
-
-### Schedule
-- **Starts**: Every day at 2:00 AM
-- **Stops**: Every day at 9:40 PM
-
-### Files
-1. `/Users/macmini/scripts/start-scanner-expo.sh` - Start script
-2. `~/Library/LaunchAgents/com.macmini.scanner.dev.start.plist` - Start job
-3. `~/Library/LaunchAgents/com.macmini.scanner.dev.stop.plist` - Stop job
-
-### Manual Commands
-```bash
-# Start/stop server
-launchctl start com.macmini.scanner.dev.start
-launchctl start com.macmini.scanner.dev.stop
-
-# Check status
-ps aux | grep "expo start"
-lsof -i :8081
-launchctl list | grep scanner
-
-# View logs
-tail -50 ~/expo-from-lingon.log
-```
+## Dev Server Details
 
 ### Network
 - Mac mini IP: `192.168.0.211`
-- Port: `8081`
+- Port: `8082` (changed from 8081 on December 13, 2025)
 - Flags: `--dev-client --host lan`
+
+### Management
+- Managed via DevDash (see Dev Server Policy above)
+- No manual launchctl commands needed
 
 ---
 

@@ -18,6 +18,10 @@
       "bundleIdentifier": "com.mommabsscanner.app",
       "buildNumber": "1",
       "appleTeamId": "9VXGGDHF22",
+      "associatedDomains": [
+        "webcredentials:mommabshousehold.com",
+        "applinks:mommabshousehold.com"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "Scanner needs camera access for barcode and expiration date scanning",
         "NSPhotoLibraryUsageDescription": "This app may access your photo library to scan barcodes from images.",
