@@ -1,9 +1,9 @@
-# Momma B's Scanner - Handoff
+# Momma B's Household - Handoff
 
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
-**Purpose:** Data ingestion via barcode scanning + AI vision
-**Last Updated:** December 12, 2025 (Associated Domains setup)
+**Purpose:** Unified household app. Current module: Scanner (barcode + AI vision data ingestion)
+**Last Updated:** December 14, 2025 (Unified app architecture)
 
 ---
 
@@ -41,6 +41,29 @@
 - **Guards philosophy** - Calls out deviations from Core Tenets
 - **Can pause production** - Has authority to stop and discuss if something feels wrong
 - **Always asks questions** - Never proceeds with uncertainty; clarification is expected
+
+---
+
+## Unified App Architecture (December 14, 2025)
+
+This app is now "Momma B's Household" — a unified app containing modules.
+
+**Current Modules:**
+- Scanner (barcode + PLU + photo workflows)
+
+**Future Modules:**
+- Pantry (native rewrite of web app)
+- Security
+- Entertainment
+- Kiosks
+
+**Structure:**
+- Home screen: Module selector
+- Each module lives in its own folder
+- Shared auth, shared Supabase backend
+- One codebase, one build, one TestFlight
+
+See Master HANDOFF for full strategy.
 
 ---
 
@@ -654,6 +677,18 @@ SELECT cron.schedule(
 **What This Enables:**
 - 1Password autofill in Scanner app login screen
 - Universal Links (deep linking from web to app)
+
+---
+
+## Production Checklist (Phase 1 - Unified App)
+
+**Pre-Launch Tasks:**
+- [ ] Rename app to "Momma B's Household" in app.json
+- [ ] New app icon (household-focused, not scanner-focused)
+- [ ] Home screen with module selector (Scanner as first/only module)
+- [ ] Update app metadata in App Store Connect
+- [ ] Update privacy policy URL if needed
+- [ ] Final TestFlight validation with unified branding
 
 ---
 

@@ -10,7 +10,7 @@
  */
 
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useMachine } from '@xstate/react';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { useCodeScanner } from 'react-native-vision-camera';
@@ -196,19 +196,6 @@ export default function BarcodeScannerV2({
 
   return (
     <View style={styles.container}>
-      {/* Debug info - remove in production */}
-      <View style={styles.debugInfo}>
-        <Text style={styles.debugText}>
-          State: {JSON.stringify(state.value)}
-        </Text>
-        <Text style={styles.debugText}>
-          Mode: {state.context.mode || 'null'}
-        </Text>
-        <Text style={styles.debugText}>
-          Barcode: {state.context.barcode || 'null'}
-        </Text>
-      </View>
-
       {/* CRASH RECOVERY - ready.interrupted state */}
       {ui.showRecoveryPrompt && (
         <View style={styles.homeScreen}>
@@ -523,7 +510,11 @@ function PLUEntryScreen({ onSubmit, onCancel }: PLUEntryScreenProps) {
   };
 
   return (
-    <View style={styles.homeScreen}>
+    <KeyboardAvoidingView
+      style={styles.homeScreen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
       <View style={styles.homeContent}>
         <Text style={styles.welcomeText}>Enter PLU Code</Text>
         <Text style={styles.instructionText}>
@@ -565,7 +556,7 @@ function PLUEntryScreen({ onSubmit, onCancel }: PLUEntryScreenProps) {
           </View>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -780,17 +771,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
   },
-  debugInfo: {
-    backgroundColor: '#2a2a2a',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#3a3a3a',
-  },
-  debugText: {
-    color: '#888',
-    fontSize: 12,
-    fontFamily: 'Courier',
-  },
   content: {
     flex: 1,
     justifyContent: 'center',
@@ -916,7 +896,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 50,
+    paddingBottom: 100,
     paddingHorizontal: 20,
   },
   buttonBackground: {
