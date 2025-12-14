@@ -14,6 +14,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Modal } 
 import { useMachine } from '@xstate/react';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { useCodeScanner } from 'react-native-vision-camera';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { scannerMachine } from '../machines/scanner.machine';
 import { StorageLocation, InventoryItem } from '../types/scanner.types';
 import StorageLocationPicker from './StorageLocationPicker';
@@ -88,6 +89,7 @@ export default function BarcodeScannerV2({
       // Scanning states
       showCamera: state.matches({ scanning: 'barcode' }),
       showPLUEntry: state.matches({ scanning: 'plu' }),
+      showPhotoCapture: state.matches({ scanning: 'photo' }),
 
       // Processing states
       showMatchSelection: state.matches({ processing: 'selectingMatch' }),
@@ -97,6 +99,7 @@ export default function BarcodeScannerV2({
       isLoading:
         state.matches({ processing: 'callingBarcodeAPI' }) ||
         state.matches({ processing: 'lookingUpPLU' }) ||
+        state.matches({ processing: 'identifyingWithAI' }) ||
         state.matches({ processing: 'creatingPLUItem' }) ||
         state.matches({ processing: 'updatingExpiration' }) ||
         state.matches({ processing: 'finalizing' }),
@@ -126,6 +129,10 @@ export default function BarcodeScannerV2({
 
       onPLUEntered: (pluCode: string) => {
         send({ type: 'PLU_ENTERED', plu_code: pluCode });
+      },
+
+      onPhotoCaptured: (photoBase64: string) => {
+        send({ type: 'PHOTO_CAPTURED', photo_base64: photoBase64 });
       },
 
       onMatchSelected: (match: any, quantity?: number) => {
@@ -272,6 +279,16 @@ export default function BarcodeScannerV2({
                 <Text style={styles.secondaryButtonText}>🔢 Enter PLU Code</Text>
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.startScanButton, styles.secondaryButton]}
+              onPress={() => send({ type: 'START_PHOTO_SCAN' })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.secondaryButtonText}>📸 Scan by Photo</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -327,6 +344,9 @@ export default function BarcodeScannerV2({
 
       {/* PLU ENTRY SCREEN - scanning.plu state */}
       {ui.showPLUEntry && <PLUEntryScreen onSubmit={handlers.onPLUEntered} onCancel={handlers.onCancel} />}
+
+      {/* PHOTO CAPTURE SCREEN - scanning.photo state */}
+      {ui.showPhotoCapture && <PhotoCaptureScreen onSubmit={handlers.onPhotoCaptured} onCancel={handlers.onCancel} />}
 
       {/* MATCH SELECTION SCREEN - processing.selectingMatch state */}
       {ui.showMatchSelection && state.context.matches && (
@@ -545,6 +565,114 @@ function PLUEntryScreen({ onSubmit, onCancel }: PLUEntryScreenProps) {
           </View>
         </TouchableOpacity>
       </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// Photo Capture Screen Component
+// ============================================================================
+
+interface PhotoCaptureScreenProps {
+  onSubmit: (photoBase64: string) => void;
+  onCancel: () => void;
+}
+
+function PhotoCaptureScreen({ onSubmit, onCancel }: PhotoCaptureScreenProps) {
+  const device = useCameraDevice('back');
+  const camera = useRef<Camera>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const handleTakePhoto = async () => {
+    if (!camera.current || isCapturing) return;
+
+    setIsCapturing(true);
+    try {
+      // Take photo
+      const photo = await camera.current.takePhoto({
+        flash: 'off',
+      });
+
+      console.log('[PhotoCapture] Photo taken:', photo.path);
+
+      // Resize image on device (512px max, ~100-300KB) - matches existing implementation
+      const fileUri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
+      const resizedImage = await ImageManipulator.manipulateAsync(
+        fileUri,
+        [{ resize: { width: 512 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+
+      console.log('[PhotoCapture] Image resized, base64 length:', resizedImage.base64?.length);
+
+      if (!resizedImage.base64) {
+        throw new Error('Failed to convert image to base64');
+      }
+
+      onSubmit(resizedImage.base64);
+    } catch (error) {
+      console.error('[PhotoCapture] Error taking photo:', error);
+      setIsCapturing(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      {device ? (
+        <>
+          <Camera
+            ref={camera}
+            style={styles.camera}
+            device={device}
+            isActive={true}
+            photo={true}
+          >
+            <View style={styles.scanFrame}>
+              <View style={styles.scanFrameCorner} />
+              <Text style={styles.scanInstruction}>Frame the produce item</Text>
+            </View>
+          </Camera>
+
+          {/* Capture Button */}
+          <View style={styles.buttonContainer}>
+            <View style={styles.buttonBackground}>
+              <TouchableOpacity
+                style={[styles.captureButton, isCapturing && styles.disabledButton]}
+                onPress={handleTakePhoto}
+                disabled={isCapturing}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.captureButtonText}>
+                  {isCapturing ? '⏳' : '📸'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={onCancel}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.cancelButtonText}>✕ Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
+      ) : (
+        <View style={styles.homeScreen}>
+          <View style={styles.homeContent}>
+            <Text style={styles.errorTitle}>Camera not available</Text>
+            <TouchableOpacity
+              style={[styles.startScanButton, styles.discardButton]}
+              onPress={onCancel}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.startScanButtonText}>✕ Cancel</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -994,5 +1122,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Photo capture button
+  captureButton: {
+    backgroundColor: '#34C759',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 15,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  captureButtonText: {
+    fontSize: 40,
+    textAlign: 'center',
   },
 });

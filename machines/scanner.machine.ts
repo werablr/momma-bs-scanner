@@ -82,6 +82,10 @@ export const scannerMachine = setup({
     isPLUWorkflow: ({ context }) => {
       return context.mode === 'plu'
     },
+
+    isPhotoWorkflow: ({ context }) => {
+      return context.mode === 'photo'
+    },
   },
 
   // ==========================================================================
@@ -110,6 +114,23 @@ export const scannerMachine = setup({
       plu_code: ({ event }) => {
         if (event.type !== 'PLU_ENTERED') return null
         return event.plu_code
+      },
+    }),
+
+    // Store photo data
+    storePhotoData: assign({
+      photo_base64: ({ event }) => {
+        if (event.type !== 'PHOTO_CAPTURED') return null
+        return event.photo_base64
+      },
+    }),
+
+    // Store PLU code from photo AI identification
+    storePLUFromPhoto: assign({
+      plu_code: ({ event }) => {
+        if (!('output' in event) || !event.output) return null
+        const output = event.output as any
+        return output.plu_code || null
       },
     }),
 
@@ -410,18 +431,52 @@ export const scannerMachine = setup({
       return data
     }),
 
+    // Photo workflow - Identify PLU from photo
+    identifyByPhoto: fromPromise(async ({ input }) => {
+      const { context } = input as { context: ScannerContext }
+
+      console.log('[identifyByPhoto] Identifying PLU from photo...')
+
+      const { data, error } = await supabase.functions.invoke('identify-photo', {
+        body: { photo_base64: context.photo_base64 },
+      })
+
+      if (error) {
+        console.error('[identifyByPhoto] ❌ Error from edge function:', error)
+        throw error
+      }
+
+      if (!data || !data.success) {
+        console.error('[identifyByPhoto] ❌ No data returned from identify-photo')
+        throw new Error('No data returned from identify-photo')
+      }
+
+      console.log('[identifyByPhoto] ✅ AI identified PLU code:', data.plu_code)
+
+      // Return PLU code to be stored in context
+      return {
+        plu_code: data.plu_code,
+        confidence: data.confidence,
+        reasoning: data.reasoning,
+      }
+    }),
+
     // PLU workflow - Create inventory item directly (no barcode API needed)
     createPLUItem: fromPromise(async ({ input }) => {
       const { context } = input as { context: ScannerContext }
 
       console.log('[createPLUItem] Creating PLU inventory item...')
-      console.log('[createPLUItem] Product:', context.product)
+      console.log('[createPLUItem] Product:', JSON.stringify(context.product, null, 2))
+      console.log('[createPLUItem] PLU Code:', context.plu_code)
       console.log('[createPLUItem] Barcode:', context.barcode)
       console.log('[createPLUItem] Storage location:', context.storage_location_id)
 
       // Extract product data from match (USDA format)
       const product = context.product as any // Match type from PLU lookup
       const nutrition = product?.nutrition
+
+      console.log('[createPLUItem] Extracted nutrition:', JSON.stringify(nutrition, null, 2))
+      console.log('[createPLUItem] FDC ID:', product?.fdc_id)
 
       // Get household_id from user_households table
       const { data: { user } } = await supabase.auth.getUser()
@@ -451,7 +506,8 @@ export const scannerMachine = setup({
         .from('inventory_items')
         .insert({
           household_id,
-          barcode: context.barcode, // PLU-{code}-{timestamp}
+          barcode: context.barcode, // PLU-{code}-{timestamp} or PHOTO-{timestamp}
+          plu_code: context.plu_code, // Store the PLU code
           storage_location_id: context.storage_location_id,
           food_name: product?.product_name || product?.description || 'Unknown PLU Item',
           brand_name: product?.brands || null,
@@ -480,6 +536,12 @@ export const scannerMachine = setup({
 
           // Serving info
           serving_unit: nutrition?.serving_unit || null,
+
+          // Data sources tracking
+          data_sources: {
+            usda: nutrition ? true : false, // USDA nutrition data present
+            plu: true, // Always true for PLU/Photo workflow
+          },
 
           // Timestamps (schema has these)
           created_at: new Date().toISOString(),
@@ -648,8 +710,11 @@ export const scannerMachine = setup({
               target: '#scanner.scanning.plu',
               actions: { type: 'setMode', params: { mode: 'plu' } },
             },
+            START_PHOTO_SCAN: {
+              target: '#scanner.scanning.photo',
+              actions: { type: 'setMode', params: { mode: 'photo' } },
+            },
             // Phase 3+: Add other workflow entry points
-            // START_PHOTO_SCAN: ...
             // START_MANUAL_ENTRY: ...
           },
         },
@@ -684,8 +749,17 @@ export const scannerMachine = setup({
           },
         },
 
+        photo: {
+          on: {
+            PHOTO_CAPTURED: {
+              target: '#scanner.processing.identifyingWithAI',
+              actions: 'storePhotoData',
+            },
+            CANCEL: '#scanner.ready.idle',
+          },
+        },
+
         // Phase 3+: Add other scanning modes
-        // photo: ...
         // manual: ...
       },
     },
@@ -742,6 +816,25 @@ export const scannerMachine = setup({
           },
         },
 
+        // Photo workflow - Identify PLU from photo, then lookup
+        identifyingWithAI: {
+          invoke: {
+            src: 'identifyByPhoto',
+            input: ({ context }) => ({ context }),
+            onDone: {
+              target: 'lookingUpPLU',
+              actions: 'storePLUFromPhoto',
+            },
+            onError: {
+              target: '#scanner.error.retryable',
+              actions: [
+                'storeError',
+                { type: 'setRetryState', params: { state: 'scanning.photo' } },
+              ],
+            },
+          },
+        },
+
         // PLU/Photo workflow - Select match from list
         selectingMatch: {
           on: {
@@ -766,7 +859,11 @@ export const scannerMachine = setup({
                 guard: 'isPLUWorkflow',
                 actions: 'storeLocation',
               },
-              // Phase 3+: Photo workflow will add uploadingPhoto state here
+              {
+                target: 'creatingPLUItem',
+                guard: 'isPhotoWorkflow',
+                actions: 'storeLocation',
+              },
             ],
             CANCEL: '#scanner.ready.idle',
           },

@@ -105,6 +105,33 @@
 - ✅ Edge function returns all variants for selection
 - ✅ RFC 4180 CSV parsing (handles multi-line quoted fields)
 
+**Photo Workflow (Complete December 14, 2025):**
+- ✅ Implementation complete and tested
+
+**Design:**
+1. User taps "Scan by Photo"
+2. Camera opens, user takes photo
+3. Upload photo to Supabase Storage
+4. Send photo to GPT-4o with prompt: *"Identify this produce item and return its 4-5 digit PLU code. Only return the PLU code number, nothing else. If uncertain, return your best guess."*
+5. GPT-4o returns PLU code (e.g., "4131")
+6. Call existing `lookup-plu` edge function with that code
+7. If single match → auto-select, proceed to location/expiration
+8. If multiple matches → user selects
+9. If no match → show "Not found" with option for manual entry
+10. Complete flow same as PLU workflow
+
+**Reuses:**
+- `lookup-plu` edge function (unchanged)
+- PLU → USDA crosswalk (already in database)
+- Match selection UI (from PLU workflow)
+- Location/expiration/review screens (from barcode workflow)
+
+**Built:**
+- ✅ `identify-photo` edge function (GPT-4o → PLU code)
+- ✅ Photo capture UI in XState
+- ✅ State machine states for photo workflow
+- ✅ USDA nutrition extraction fixed (nutrient.id format)
+
 ### ✅ PHASE 2 COMPLETE: XState State Machine (Nov 29, 2025)
 
 **Scanner (BarcodeScanner.tsx):**
@@ -121,7 +148,7 @@
 - Authentication & RLS (secure login, household-based isolation)
 - Barcode scanning (UPC/EAN via camera)
 - PLU code entry (manual entry for produce stickers)
-- AI Vision (OpenAI GPT-4o identifying produce)
+- ✅ **Photo workflow (implemented December 14, 2025)** - AI Vision identifying PLU codes
 - Multi-API integration (Open Food Facts + UPCitemdb + USDA - **parallelized**)
 - Photo uploads (Supabase Storage)
 - Manual entry fallback
@@ -370,7 +397,7 @@ supabase functions deploy lookup-plu
 
 #### Phase 3: Additional Workflows ✅ COMPLETE
 - ✅ PLU workflow (implemented and tested)
-- ⏳ Photo workflow (deferred)
+- ✅ Photo workflow (implemented December 14, 2025)
 - ⏳ Manual entry workflow (deferred)
 - ✅ Crash recovery (implemented)
 
@@ -636,5 +663,5 @@ SELECT cron.schedule(
 **Performance:** B- (sequential APIs slow scans)
 **Security:** A (RLS, JWT, service role correct)
 **Last Audit:** November 28, 2025
-**Last Updated:** December 12, 2025 (Associated Domains setup)
+**Last Updated:** December 14, 2025 (Photo workflow complete)
 **Next Review:** After P0/P1 fixes (December 15, 2025)

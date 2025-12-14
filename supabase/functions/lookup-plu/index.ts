@@ -102,6 +102,12 @@ serve(async (req) => {
 
       const food = await response.json()
 
+      console.log(`  DEBUG: USDA food response for FDC ${pluData.usda_fdc_id}:`, JSON.stringify(food).substring(0, 500))
+      console.log(`  DEBUG: foodNutrients array length:`, food.foodNutrients?.length || 0)
+
+      const extractedNutrition = extractUSDANutrition(food.foodNutrients || [])
+      console.log(`  DEBUG: Extracted nutrition:`, JSON.stringify(extractedNutrition))
+
       matches.push({
         source: 'usda',
         plu_data: {
@@ -118,7 +124,7 @@ serve(async (req) => {
         brands: '',
         image_url: null,
         image_thumb_url: null,
-        nutrition: extractUSDANutrition(food.foodNutrients || []),
+        nutrition: extractedNutrition,
         data_type: food.dataType,
         scientific_name: food.scientificName || pluData.botanical,
         ndb_number: food.ndbNumber || null,
@@ -169,9 +175,15 @@ function extractUSDANutrition(nutrients: any[]): any {
   }
 
   for (const nutrient of nutrients) {
-    const fieldName = nutrientMap[nutrient.nutrientId]
-    if (fieldName && nutrient.value != null) {
-      nutrition[fieldName] = nutrient.value
+    // Handle both API response formats:
+    // - Direct lookup API: { nutrientId: 1008, value: 52 }
+    // - Food details API: { nutrient: { id: 1008 }, amount: 52 }
+    const nutrientId = nutrient.nutrientId || nutrient.nutrient?.id
+    const value = nutrient.value ?? nutrient.amount
+
+    const fieldName = nutrientMap[nutrientId]
+    if (fieldName && value != null) {
+      nutrition[fieldName] = value
     }
   }
 
