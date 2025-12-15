@@ -323,66 +323,84 @@ export function ControlTowerMark({
   inverted = false,
   frameColor,
 }: ControlTowerMarkProps) {
-  const tileGap = Math.round(size * 0.065); // proportionate spacing
+  // Match icon-generator.html exactly (lines 554-626)
+  const tileGapPercent = 0.065;
+  const tileGap = Math.round(size * tileGapPercent);
   const tileSize = Math.round((size - tileGap * 4) / 3);
 
+  // Scale factor (icon generator uses 1024 base, scales to size)
+  const scale = size / 1024;
+  const frameRadius = 18 * scale;
+  const tileRadius = 14 * scale;
+
   const frameBg = frameColor || (inverted ? "rgba(255,255,255,0.14)" : Theme.color.ink);
-  const tileBase = inverted ? "rgba(255,255,255,0.85)" : "#FFFFFF";
-  const tileDim = inverted ? "rgba(255,255,255,0.50)" : "rgba(255,255,255,0.70)";
+  const tileColor = "#FFFFFF";
+  const tileOpacity = 1.0;
+  const dimOpacity = 0.70;
 
   const emphasized = new Set(emphasis?.emphasize ?? []);
-  const deemphasized = new Set(emphasis?.deemphasize ?? []);
+  const hasEmphasis = emphasized.size > 0;
+
+  // Build 3x3 grid manually to match exact positioning from canvas
+  const tiles = [];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const index = row * 3 + col;
+      const isEmph = emphasized.has(index);
+
+      // x = tileGap * 2 + col * (tileSize + tileGap)
+      // y = tileGap * 2 + row * (tileSize + tileGap)
+      const x = tileGap * 2 + col * (tileSize + tileGap);
+      const y = tileGap * 2 + row * (tileSize + tileGap);
+
+      const opacity = hasEmphasis
+        ? (isEmph ? tileOpacity : dimOpacity)
+        : tileOpacity;
+
+      tiles.push(
+        <View
+          key={index}
+          style={{
+            position: 'absolute',
+            left: x,
+            top: y,
+            width: tileSize,
+            height: tileSize,
+            borderRadius: tileRadius,
+            backgroundColor: tileColor,
+            opacity,
+          }}
+        />
+      );
+    }
+  }
 
   return (
     <View
-      style={[
-        {
-          width: size,
-          height: size,
-          borderRadius: Theme.radius.frame,
-          backgroundColor: frameBg,
-          padding: tileGap,
-        },
-        Theme.shadow.frame,
-      ]}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: frameRadius,
+        backgroundColor: frameBg,
+        position: 'relative',
+      }}
     >
+      {/* Inner frame border */}
       <View
         style={{
-          flex: 1,
-          borderRadius: Theme.radius.frame - 4,
-          // micro-depth: very subtle inner boundary
-          borderWidth: 1,
-          borderColor: inverted ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.10)",
-          padding: tileGap,
+          position: 'absolute',
+          left: tileGap,
+          top: tileGap,
+          width: size - tileGap * 2,
+          height: size - tileGap * 2,
+          borderRadius: Math.max(0, frameRadius - (4 * scale)),
+          borderWidth: 2 * scale,
+          borderColor: 'rgba(255, 255, 255, 0.10)',
         }}
-      >
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: tileGap }}>
-          {Array.from({ length: 9 }).map((_, i) => {
-            const isEmph = emphasized.has(i);
-            const hasEmphasis = emphasized.size > 0;
+      />
 
-            // Match web icon generator logic:
-            // - If no emphasis pattern, all tiles are full opacity
-            // - If emphasis pattern exists, emphasized tiles are full opacity, others are dimmed
-            const opacity = hasEmphasis
-              ? (isEmph ? 1.0 : 0.70)
-              : 1.0;
-
-            return (
-              <View
-                key={i}
-                style={{
-                  width: tileSize,
-                  height: tileSize,
-                  borderRadius: Theme.radius.tile,
-                  backgroundColor: tileBase,
-                  opacity,
-                }}
-              />
-            );
-          })}
-        </View>
-      </View>
+      {/* Tiles positioned absolutely to match canvas exactly */}
+      {tiles}
     </View>
   );
 }
