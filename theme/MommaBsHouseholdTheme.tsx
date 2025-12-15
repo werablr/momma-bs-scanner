@@ -41,7 +41,7 @@ export const Theme = {
 
     // Module frame colors (app icon backgrounds)
     frameHousehold: "#3B7EFF", // bright blue
-    frameScanner: "#28A745", // bright green
+    frameScanner: "#00f900", // bright green
     framePantry: "#8B5CF6", // bright purple
 
     // Status (used sparingly; never decoration)
