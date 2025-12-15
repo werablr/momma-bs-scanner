@@ -5,6 +5,7 @@ import ScannerErrorBoundary from '../../components/ScannerErrorBoundary';
 import AuthScreen from '../../components/AuthScreen';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { Theme } from '../../theme/MommaBsHouseholdTheme';
 
 export default function HomeScreen() {
   const { user, household, loading } = useAuth();
@@ -66,7 +67,7 @@ export default function HomeScreen() {
   if (loading || locationsLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#fff" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -153,18 +154,18 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Theme.color.bg,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: Theme.color.frameScanner,
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
   },
   productInfo: {
     flex: 1,

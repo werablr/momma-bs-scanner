@@ -20,6 +20,7 @@ import { StorageLocation, InventoryItem } from '../types/scanner.types';
 import StorageLocationPicker from './StorageLocationPicker';
 import ExpirationDateCapture from './ExpirationDateCapture';
 import EditableReview from './EditableReview';
+import { Theme } from '../theme/MommaBsHouseholdTheme';
 
 // ============================================================================
 // Component Props
@@ -769,7 +770,7 @@ function MatchSelectionScreen({ matches, onSelect, onCancel }: MatchSelectionScr
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: Theme.color.frameScanner,
   },
   content: {
     flex: 1,
@@ -779,7 +780,7 @@ const styles = StyleSheet.create({
   },
   stateIndicator: {
     fontSize: 18,
-    color: '#4CAF50',
+    color: Theme.color.ok,
     marginVertical: 4,
   },
   // Home screen (from BarcodeScanner.js lines 904-945)
@@ -787,7 +788,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0e1a',
+    backgroundColor: Theme.color.frameScanner,
   },
   homeContent: {
     alignItems: 'center',
@@ -809,16 +810,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   startScanButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     paddingVertical: 20,
     paddingHorizontal: 40,
-    borderRadius: 15,
+    borderRadius: Theme.radius.input,
     width: '90%',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.20)',
   },
   buttonInner: {
     alignItems: 'center',
@@ -845,8 +843,8 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderWidth: 3,
-    borderColor: '#34C759',
-    borderRadius: 20,
+    borderColor: 'rgba(255,255,255,0.28)',
+    borderRadius: Theme.radius.section,
     backgroundColor: 'transparent',
   },
   scanInstruction: {
@@ -957,7 +955,7 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#34C759',
+    color: '#fff',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -976,26 +974,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButton: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: 'rgba(0,0,0,0.30)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
     marginTop: 15,
   },
   secondaryButtonText: {
-    color: '#34C759',
+    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
     textAlign: 'center',
   },
   // PLU Entry screen styles
   pluInput: {
-    backgroundColor: '#2C2C2E',
+    backgroundColor: 'rgba(255,255,255,0.10)',
     color: '#fff',
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
     padding: 20,
-    borderRadius: 12,
+    borderRadius: Theme.radius.input,
     borderWidth: 2,
-    borderColor: '#34C759',
+    borderColor: 'rgba(255,255,255,0.20)',
     marginBottom: 30,
     width: '80%',
   },
@@ -1005,14 +1005,14 @@ const styles = StyleSheet.create({
   // Match Selection screen styles
   matchSelectionContainer: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: Theme.color.frameScanner,
   },
   matchSelectionHeader: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderBottomWidth: 1,
-    borderBottomColor: '#444',
+    borderBottomColor: 'rgba(255,255,255,0.10)',
   },
   matchSelectionTitle: {
     fontSize: 24,
@@ -1025,17 +1025,17 @@ const styles = StyleSheet.create({
     color: '#ccc',
   },
   matchItem: {
-    backgroundColor: '#2C2C2E',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     padding: 20,
     marginHorizontal: 15,
     marginTop: 15,
-    borderRadius: 12,
+    borderRadius: Theme.radius.section,
     borderWidth: 2,
-    borderColor: '#444',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   matchItemSelected: {
-    borderColor: '#34C759',
-    backgroundColor: '#1C3A28',
+    borderColor: 'rgba(255,255,255,0.40)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
   },
   matchItemName: {
     fontSize: 18,
@@ -1052,9 +1052,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderTopWidth: 1,
-    borderTopColor: '#444',
+    borderTopColor: 'rgba(255,255,255,0.10)',
   },
   quantityLabel: {
     fontSize: 18,
@@ -1062,7 +1062,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   quantityInput: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: 'rgba(0,0,0,0.30)',
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
@@ -1070,28 +1070,30 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#34C759',
+    borderColor: 'rgba(255,255,255,0.20)',
     width: 80,
   },
   matchSelectionActions: {
     flexDirection: 'row',
     padding: 15,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderTopWidth: 1,
-    borderTopColor: '#444',
+    borderTopColor: 'rgba(255,255,255,0.10)',
   },
   matchActionButton: {
     flex: 1,
     padding: 15,
-    borderRadius: 12,
+    borderRadius: Theme.radius.input,
     alignItems: 'center',
     marginHorizontal: 5,
   },
   matchCancelButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: Theme.color.bad,
   },
   matchSelectButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.20)',
   },
   matchCancelButtonText: {
     color: '#fff',
@@ -1105,7 +1107,9 @@ const styles = StyleSheet.create({
   },
   // Photo capture button
   captureButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.30)',
     width: 80,
     height: 80,
     borderRadius: 40,
@@ -1113,11 +1117,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     marginBottom: 15,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
   captureButtonText: {
     fontSize: 40,
