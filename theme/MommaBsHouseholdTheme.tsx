@@ -308,6 +308,7 @@ type ControlTowerMarkProps = {
   size?: number;
   emphasis?: GridEmphasis;
   inverted?: boolean; // for scanner/dark surfaces
+  frameColor?: string; // custom frame color
 };
 
 /**
@@ -320,11 +321,12 @@ export function ControlTowerMark({
   size = 72,
   emphasis,
   inverted = false,
+  frameColor,
 }: ControlTowerMarkProps) {
   const tileGap = Math.round(size * 0.065); // proportionate spacing
   const tileSize = Math.round((size - tileGap * 4) / 3);
 
-  const frameBg = inverted ? "rgba(255,255,255,0.14)" : Theme.color.ink;
+  const frameBg = frameColor || (inverted ? "rgba(255,255,255,0.14)" : Theme.color.ink);
   const tileBase = inverted ? "rgba(255,255,255,0.85)" : "#FFFFFF";
   const tileDim = inverted ? "rgba(255,255,255,0.50)" : "rgba(255,255,255,0.70)";
 

@@ -20,7 +20,7 @@ import { StorageLocation, InventoryItem } from '../types/scanner.types';
 import StorageLocationPicker from './StorageLocationPicker';
 import ExpirationDateCapture from './ExpirationDateCapture';
 import EditableReview from './EditableReview';
-import { Theme } from '../theme/MommaBsHouseholdTheme';
+import { Theme, ControlTowerMark } from '../theme/MommaBsHouseholdTheme';
 
 // ============================================================================
 // Component Props
@@ -242,6 +242,14 @@ export default function BarcodeScannerV2({
       {/* HOME SCREEN - ready.idle state */}
       {ui.showHomeScreen && (
         <View style={styles.homeScreen}>
+          <View style={styles.homeHeader}>
+            <ControlTowerMark
+              size={54}
+              emphasis={{ emphasize: [1, 3, 4, 5, 7] }}
+              frameColor={Theme.color.frameScanner}
+            />
+            <Text style={styles.appTitle}>Momma B's Scanner</Text>
+          </View>
           <View style={styles.homeContent}>
             <Text style={styles.welcomeText}>Scanner Ready</Text>
             <Text style={styles.instructionText}>
@@ -786,11 +794,24 @@ const styles = StyleSheet.create({
   // Home screen (from BarcodeScanner.js lines 904-945)
   homeScreen: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: Theme.color.bg,
+  },
+  homeHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Theme.color.frameScanner,
+    gap: Theme.space.md,
+    padding: Theme.space.lg,
+    paddingTop: 60,
+  },
+  appTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Theme.color.ink,
+    letterSpacing: 0.2,
   },
   homeContent: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 30,
     width: '100%',
@@ -798,25 +819,23 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: Theme.color.ink,
     marginBottom: 15,
     textAlign: 'center',
   },
   instructionText: {
     fontSize: 16,
-    color: '#ccc',
+    color: Theme.color.inkMuted,
     textAlign: 'center',
     marginBottom: 40,
     paddingHorizontal: 20,
   },
   startScanButton: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: Theme.color.frameScanner,
     paddingVertical: 20,
     paddingHorizontal: 40,
     borderRadius: Theme.radius.input,
     width: '90%',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
   },
   buttonInner: {
     alignItems: 'center',
@@ -974,13 +993,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButton: {
-    backgroundColor: 'rgba(0,0,0,0.30)',
+    backgroundColor: Theme.color.panelMuted,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: Theme.color.border,
     marginTop: 15,
   },
   secondaryButtonText: {
-    color: '#fff',
+    color: Theme.color.ink,
     fontSize: 18,
     fontWeight: '600',
     textAlign: 'center',
