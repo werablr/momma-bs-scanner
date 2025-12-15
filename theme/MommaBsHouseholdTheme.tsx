@@ -328,10 +328,10 @@ export function ControlTowerMark({
   const tileGap = Math.round(size * tileGapPercent);
   const tileSize = Math.round((size - tileGap * 4) / 3);
 
-  // Scale factor (icon generator uses 1024 base, scales to size)
+  // Match icon generator exactly - don't round radii, keep decimal precision
   const scale = size / 1024;
-  const frameRadius = 18 * scale;
-  const tileRadius = 14 * scale;
+  const frameRadius = 18 * scale;  // e.g., 54px: 18*(54/1024) = 0.94
+  const tileRadius = 14 * scale;   // e.g., 54px: 14*(54/1024) = 0.74
 
   const frameBg = frameColor || (inverted ? "rgba(255,255,255,0.14)" : Theme.color.ink);
   const tileColor = "#FFFFFF";
