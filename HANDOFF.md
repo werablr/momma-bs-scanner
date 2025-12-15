@@ -680,11 +680,47 @@ SELECT cron.schedule(
 
 ---
 
+## Visual Design System (December 14, 2025)
+
+**Theme File:** `/theme/MommaBsHouseholdTheme.tsx`
+
+**Control Tower Visual Language:**
+- Dark frame (#0F172A) with subtle depth
+- 3×3 grid of white tiles inside frame
+- Each module has unique emphasis pattern:
+  - Household: All tiles equal (no emphasis)
+  - Scanner: Cross pattern [1, 3, 4, 5, 7]
+  - Pantry: Top two rows [0, 1, 2, 3, 4, 5]
+  - Custom: User-defined
+
+**Design Primitives:**
+- `ScreenShell` - Structured header + contained sections
+- `Section` - Contained panel with title/hint
+- `ActionButton` - Primary + ghost variants
+- `ControlTowerMark` - In-app icon component
+
+**Design Tokens:**
+- Colors: White/slate surfaces, charcoal structure, status-only accents
+- Typography: Weight + spacing hierarchy (not color)
+- Spacing: 4px base unit (xxs to xxl)
+- Radii: 14-24px (tiles to app-level)
+- Shadows: Subtle authority (no playfulness)
+
+**Icon Generator Tool:**
+- **URL:** https://mommabshousehold-site.pages.dev/icon-generator.html
+- Interactive tool to create icon variants
+- Download 1024×1024 PNG exports
+
+---
+
 ## Production Checklist (Phase 1 - Unified App)
 
 **Pre-Launch Tasks:**
 - [ ] Rename app to "Momma B's Household" in app.json
 - [ ] New app icon (household-focused, not scanner-focused)
+  - **Icon Generator:** https://mommabshousehold-site.pages.dev/icon-generator.html
+  - Create Control Tower icon variants (Household, Scanner, Pantry)
+  - Download 1024×1024 PNG for app icon
 - [ ] Home screen with module selector (Scanner as first/only module)
 - [ ] Update app metadata in App Store Connect
 - [ ] Update privacy policy URL if needed
