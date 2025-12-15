@@ -359,11 +359,14 @@ export function ControlTowerMark({
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: tileGap }}>
           {Array.from({ length: 9 }).map((_, i) => {
             const isEmph = emphasized.has(i);
-            const isDeemph = deemphasized.has(i);
+            const hasEmphasis = emphasized.size > 0;
 
-            // default tiles are consistent; emphasis is subtle (not decorative)
-            const bg = isDeemph ? tileDim : tileBase;
-            const opacity = isEmph ? 1 : isDeemph ? 0.65 : 0.92;
+            // Match web icon generator logic:
+            // - If no emphasis pattern, all tiles are full opacity
+            // - If emphasis pattern exists, emphasized tiles are full opacity, others are dimmed
+            const opacity = hasEmphasis
+              ? (isEmph ? 1.0 : 0.70)
+              : 1.0;
 
             return (
               <View
@@ -372,7 +375,7 @@ export function ControlTowerMark({
                   width: tileSize,
                   height: tileSize,
                   borderRadius: Theme.radius.tile,
-                  backgroundColor: bg,
+                  backgroundColor: tileBase,
                   opacity,
                 }}
               />
