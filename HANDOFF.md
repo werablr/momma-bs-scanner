@@ -3,7 +3,7 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Unified household app. Current module: Scanner (barcode + AI vision data ingestion)
-**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback search)
+**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback + idempotency keys)
 
 ---
 
@@ -252,13 +252,24 @@ See Master HANDOFF for full strategy.
    - **Files:** supabase/functions/identify-by-photo/index.ts:142-190
    - **Deployed:** ✅ Live on Supabase edge functions
 
-### 🟢 **P2 - Medium Priority (This Month)**
+### ✅ **P2 - Medium Priority (Fixed December 17, 2025)**
 
-5. **No Idempotency Keys** - All edge functions
+5. **No Idempotency Keys** - ✅ **FIXED**
    - **Problem:** Network retries create duplicate inventory items; no deduplication protection
-   - **Impact (Current Scale):** Low (rare with 2 users)
-   - **Fix:** Add UUID-based idempotency key tracking
-   - **Effort:** Medium (2-3 hours)
+   - **Solution:** Added idempotency_keys table with 24-hour TTL and pg_cron cleanup
+   - **Fixed:** December 17, 2025
+   - **Implementation:**
+     - Client generates UUID when location selected, persists on retry
+     - Edge function checks table before INSERT, returns cached response if key exists
+     - pg_cron cleans up expired keys daily at 4am UTC
+   - **Files:**
+     - `supabase/migrations/20251217000000_add_idempotency_keys.sql`
+     - `supabase/functions/scanner-ingest/index.ts` (Step 1 + Manual workflow)
+     - `machines/scanner.machine.ts` (UUID generation in storeLocation)
+     - `types/scanner.types.ts` (added idempotency_key to context)
+   - **Deployed:** ✅ Migration pushed, edge function deployed
+
+### 🟢 **P2 - Medium Priority (This Month)**
 
 ### 🔵 **P3-P5 - Defer (Code Quality, Not Blocking)**
 
@@ -737,5 +748,5 @@ SELECT cron.schedule(
 **Performance:** B- (sequential APIs slow scans)
 **Security:** A (RLS, JWT, service role correct)
 **Last Audit:** November 28, 2025
-**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback search)
+**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback + idempotency keys)
 **Next Review:** December 31, 2025

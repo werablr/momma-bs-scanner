@@ -134,11 +134,19 @@ export const scannerMachine = setup({
       },
     }),
 
-    // Store location
+    // Store location and generate idempotency key
     storeLocation: assign({
       storage_location_id: ({ event }) => {
         if (event.type !== 'LOCATION_SELECTED') return null
         return event.location_id
+      },
+      idempotency_key: () => {
+        // Generate UUID for idempotency (React Native compatible)
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0
+          const v = c === 'x' ? r : (r & 0x3 | 0x8)
+          return v.toString(16)
+        })
       },
     }),
 
@@ -338,6 +346,7 @@ export const scannerMachine = setup({
       console.log('[callStep1] Starting Step 1 API call...')
       console.log('[callStep1] Barcode:', context.barcode)
       console.log('[callStep1] Storage location:', context.storage_location_id)
+      console.log('[callStep1] Idempotency key:', context.idempotency_key)
 
       const { data, error } = await supabase.functions.invoke('scanner-ingest', {
         body: {
@@ -345,6 +354,7 @@ export const scannerMachine = setup({
           step: 1,
           barcode: context.barcode,
           storage_location_id: context.storage_location_id,
+          idempotency_key: context.idempotency_key,
         },
       })
 

@@ -79,7 +79,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json()
-    const { workflow, step, barcode, storage_location_id, scan_id, ocr_text, extracted_date, confidence, processing_time_ms, product_name, brand_name, category, expiration_date, notes } = requestBody
+    const { workflow, step, barcode, storage_location_id, scan_id, ocr_text, extracted_date, confidence, processing_time_ms, product_name, brand_name, category, expiration_date, notes, idempotency_key } = requestBody
 
     // Initialize Supabase client with service_role for database operations
     const supabaseClient = createClient(
@@ -109,8 +109,40 @@ serve(async (req) => {
 
       // STEP 1: Barcode scan with storage location
       if (step === 1) {
-        await dbLog(supabaseClient, 'info', 'Step 1: Processing barcode', { barcode, storage_location_id }, barcode)
+        await dbLog(supabaseClient, 'info', 'Step 1: Processing barcode', { barcode, storage_location_id, idempotency_key }, barcode)
         console.log('Step 1: Processing barcode:', barcode, 'Storage:', storage_location_id)
+
+        // IDEMPOTENCY: Check if this request has been processed before
+        if (idempotency_key) {
+          const { data: existingKey, error: keyError } = await supabaseClient
+            .from('idempotency_keys')
+            .select('response_data, expires_at')
+            .eq('key', idempotency_key)
+            .single()
+
+          if (existingKey && !keyError) {
+            // Check if key is still valid (not expired)
+            const expiresAt = new Date(existingKey.expires_at)
+            if (expiresAt > new Date()) {
+              await dbLog(supabaseClient, 'info', 'Idempotency key cache hit', { idempotency_key }, barcode)
+              console.log('✓ Idempotency cache hit, returning cached response')
+              return new Response(
+                JSON.stringify(existingKey.response_data),
+                {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  status: 200,
+                }
+              )
+            } else {
+              // Key expired, delete it and continue with fresh request
+              await supabaseClient
+                .from('idempotency_keys')
+                .delete()
+                .eq('key', idempotency_key)
+              console.log('✓ Idempotency key expired, processing fresh request')
+            }
+          }
+        }
 
         // PRIORITY 1: Check product_catalog first (avoid API calls if cached)
         await dbLog(supabaseClient, 'debug', 'Checking product_catalog', null, barcode)
@@ -408,24 +440,38 @@ serve(async (req) => {
 
         console.log('Step 1 complete, inventory_item_id:', inventoryItem.id)
 
+        const responseData = {
+          success: true,
+          item_id: inventoryItem.id,
+          product: {
+            name: product.food_name,
+            brand: product.brand_name,
+            serving_size: product.serving_qty,
+            serving_unit: product.serving_unit,
+            // Display uses COALESCE(user_*, usda_*, off_*, upc_*) in Pantry app
+            calories: offNutrition.off_calories ?? upcNutrition.upc_calories ?? null,
+            protein: offNutrition.off_protein ?? upcNutrition.upc_protein ?? null,
+            carbs: offNutrition.off_total_carbohydrate ?? null,
+            fat: offNutrition.off_total_fat ?? upcNutrition.upc_total_fat ?? null,
+          },
+          suggested_category: categorizeProduct(product),
+          confidence_score: 1.0,
+        }
+
+        // IDEMPOTENCY: Cache response if idempotency_key provided
+        if (idempotency_key) {
+          await supabaseClient
+            .from('idempotency_keys')
+            .insert({
+              key: idempotency_key,
+              response_data: responseData,
+            })
+            .then(() => console.log('✓ Cached response with idempotency key'))
+            .catch((err: any) => console.error('⚠️  Failed to cache idempotency key:', err))
+        }
+
         return new Response(
-          JSON.stringify({
-            success: true,
-            item_id: inventoryItem.id,
-            product: {
-              name: product.food_name,
-              brand: product.brand_name,
-              serving_size: product.serving_qty,
-              serving_unit: product.serving_unit,
-              // Display uses COALESCE(user_*, usda_*, off_*, upc_*) in Pantry app
-              calories: offNutrition.off_calories ?? upcNutrition.upc_calories ?? null,
-              protein: offNutrition.off_protein ?? upcNutrition.upc_protein ?? null,
-              carbs: offNutrition.off_total_carbohydrate ?? null,
-              fat: offNutrition.off_total_fat ?? upcNutrition.upc_total_fat ?? null,
-            },
-            suggested_category: categorizeProduct(product),
-            confidence_score: 1.0,
-          }),
+          JSON.stringify(responseData),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
@@ -473,8 +519,40 @@ serve(async (req) => {
 
     // Manual entry workflow (for items without barcodes)
     if (workflow === 'manual') {
-      await dbLog(supabaseClient, 'info', 'Manual entry', { product_name, storage_location_id }, null)
+      await dbLog(supabaseClient, 'info', 'Manual entry', { product_name, storage_location_id, idempotency_key }, null)
       console.log('Manual entry:', product_name, 'Storage:', storage_location_id)
+
+      // IDEMPOTENCY: Check if this request has been processed before
+      if (idempotency_key) {
+        const { data: existingKey, error: keyError } = await supabaseClient
+          .from('idempotency_keys')
+          .select('response_data, expires_at')
+          .eq('key', idempotency_key)
+          .single()
+
+        if (existingKey && !keyError) {
+          // Check if key is still valid (not expired)
+          const expiresAt = new Date(existingKey.expires_at)
+          if (expiresAt > new Date()) {
+            await dbLog(supabaseClient, 'info', 'Idempotency key cache hit (manual)', { idempotency_key }, null)
+            console.log('✓ Idempotency cache hit (manual), returning cached response')
+            return new Response(
+              JSON.stringify(existingKey.response_data),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+              }
+            )
+          } else {
+            // Key expired, delete it and continue with fresh request
+            await supabaseClient
+              .from('idempotency_keys')
+              .delete()
+              .eq('key', idempotency_key)
+            console.log('✓ Idempotency key expired (manual), processing fresh request')
+          }
+        }
+      }
 
       // Create inventory item with minimal data
       // Generate a unique barcode for manual entries (format: MANUAL-timestamp)
@@ -514,12 +592,26 @@ serve(async (req) => {
 
       console.log('Manual entry complete, item_id:', inventoryItem.id)
 
+      const responseData = {
+        success: true,
+        scan_id: inventoryItem.id,
+        item: inventoryItem,
+      }
+
+      // IDEMPOTENCY: Cache response if idempotency_key provided
+      if (idempotency_key) {
+        await supabaseClient
+          .from('idempotency_keys')
+          .insert({
+            key: idempotency_key,
+            response_data: responseData,
+          })
+          .then(() => console.log('✓ Cached response with idempotency key (manual)'))
+          .catch((err: any) => console.error('⚠️  Failed to cache idempotency key (manual):', err))
+      }
+
       return new Response(
-        JSON.stringify({
-          success: true,
-          scan_id: inventoryItem.id,
-          item: inventoryItem,
-        }),
+        JSON.stringify(responseData),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,

@@ -48,6 +48,9 @@ export interface ScannerContext {
   // Flag for review
   flag_reason: string | null
   flag_notes: string | null
+
+  // Idempotency key for edge function deduplication
+  idempotency_key: string | null
 }
 
 // ============================================================================
@@ -331,4 +334,5 @@ export const initialScannerContext: ScannerContext = {
   retry_state: null,
   flag_reason: null,
   flag_notes: null,
+  idempotency_key: null,
 }
