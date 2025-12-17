@@ -5,8 +5,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../lib/supabase';
 import scannerAPI from '../services/scannerAPI';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
+  const { household } = useAuth();
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const device = useCameraDevice('back');
@@ -91,10 +93,9 @@ export default function PhotoCaptureScreen({ onPhotoIdentified, onCancel }) {
       });
 
       // Generate unique filename with household folder structure
-      const HOUSEHOLD_ID = '7c093e13-4bcf-463e-96c1-9f499de9c4f2';
       const timestamp = Date.now();
       const filename = `${timestamp}.jpg`;
-      const filePath = `${HOUSEHOLD_ID}/${filename}`;
+      const filePath = `${household.id}/${filename}`;
 
       // Decode base64 to binary for upload
       const byteCharacters = atob(base64);

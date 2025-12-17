@@ -3,7 +3,7 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Unified household app. Current module: Scanner (barcode + AI vision data ingestion)
-**Last Updated:** December 14, 2025 (Unified app architecture)
+**Last Updated:** December 17, 2025 (Fixed hardcoded household ID)
 
 ---
 
@@ -233,16 +233,14 @@ See Master HANDOFF for full strategy.
    - **Impact:** 50% faster barcode scanning (4-6s → 2-3s)
    - **Deployed:** Yes, live on Supabase edge functions
 
-### 🟡 **P1 - High Priority (Next Week - EDGE FUNCTIONS ONLY, NOT BarcodeScanner.js)**
+### ✅ **P1 - High Priority (Fixed December 17, 2025)**
 
-4. **Hardcoded Household ID** - `BarcodeScanner.js:42` - ⚠️ **DEFERRED**
-   - **Problem:** `const HOUSEHOLD_ID = '7c093e13-4bcf-463e-96c1-9f499de9c4f2';`
-   - **Verified:** Line 42, hardcoded UUID
-   - **Impact:** Blocks adding 2nd household
-   - **Fix:** Use auth context for household_id
-   - **Effort:** Low (30 minutes)
-   - **Risk:** HIGH (requires touching BarcodeScanner.js state)
-   - **Decision:** DEFER until after state machine rewrite
+4. **Hardcoded Household ID** - ✅ **FIXED**
+   - **Problem:** `const HOUSEHOLD_ID = '7c093e13-4bcf-463e-96c1-9f499de9c4f2';` in PhotoCaptureScreen.js
+   - **Solution:** Replaced with `household.id` from `useAuth()` hook
+   - **Fixed:** December 17, 2025 in PhotoCaptureScreen.js
+   - **Impact:** Multi-household support now enabled for photo workflow
+   - **Files:** components/PhotoCaptureScreen.js:8,11,98
 
 ### 🟢 **P2 - Medium Priority (This Month)**
 
@@ -685,13 +683,12 @@ SELECT cron.schedule(
 **Theme File:** `/theme/MommaBsHouseholdTheme.tsx`
 
 **Control Tower Visual Language:**
-- Dark frame (#0F172A) with subtle depth
+- Colored frame with subtle depth
 - 3×3 grid of white tiles inside frame
-- Each module has unique emphasis pattern:
-  - Household: All tiles equal (no emphasis)
-  - Scanner: Cross pattern [1, 3, 4, 5, 7]
-  - Pantry: Top two rows [0, 1, 2, 3, 4, 5]
-  - Custom: User-defined
+- Each module has unique frame color and emphasis pattern:
+  - Household: Blue frame (#3B7EFF), no emphasis []
+  - Scanner: Green frame (#00f900), emphasis [0, 1, 3, 4, 6, 7]
+  - Pantry: Purple frame (#8B5CF6), emphasis [0, 1, 2, 3, 4, 5]
 
 **Design Primitives:**
 - `ScreenShell` - Structured header + contained sections
@@ -703,8 +700,10 @@ SELECT cron.schedule(
 - Colors: White/slate surfaces, charcoal structure, status-only accents
 - Typography: Weight + spacing hierarchy (not color)
 - Spacing: 4px base unit (xxs to xxl)
-- Radii: 14-24px (tiles to app-level)
+- Radii: Frame 18px, Tile 14px, Section 16px (from icon-generator.html)
 - Shadows: Subtle authority (no playfulness)
+- Tile gap: 6.5% of icon size
+- Tile opacity: 1.0 (emphasized), 0.70 (dimmed)
 
 **Icon Generator Tool:**
 - **URL:** https://mommabshousehold-site.pages.dev/icon-generator.html
