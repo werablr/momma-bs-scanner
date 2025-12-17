@@ -128,7 +128,7 @@ async function searchUSDAFoods(productName: string, usdaApiKey: string): Promise
 
   const searchUrl = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(searchTerm)}&dataType=Foundation,SR Legacy&pageSize=10&api_key=${usdaApiKey}`
 
-  console.log('Searching USDA FoodData for:', searchTerm)
+  console.log('USDA search attempt 1:', searchTerm)
 
   const response = await fetch(searchUrl)
 
@@ -140,6 +140,53 @@ async function searchUSDAFoods(productName: string, usdaApiKey: string): Promise
   const data = await response.json()
 
   if (!data.foods || data.foods.length === 0) {
+    // Attempt 2: Fallback to generic produce search if variety-specific failed
+    const baseProduce = ['apple', 'pear', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry', 'blackberry', 'peach', 'plum', 'cherry', 'melon', 'watermelon', 'cantaloupe', 'mango', 'pineapple', 'kiwi', 'avocado', 'tomato', 'pepper', 'onion', 'garlic', 'potato', 'carrot', 'broccoli', 'cauliflower', 'lettuce', 'spinach', 'kale', 'cucumber', 'zucchini', 'squash', 'eggplant', 'celery', 'asparagus', 'mushroom', 'corn']
+
+    const termLower = searchTerm.toLowerCase()
+    const matchedProduce = baseProduce.find(item => termLower.includes(item))
+
+    if (matchedProduce) {
+      const fallbackTerm = `${matchedProduce} raw`
+      console.log('USDA search attempt 2 (fallback):', fallbackTerm)
+
+      const fallbackUrl = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(fallbackTerm)}&dataType=Foundation,SR Legacy&pageSize=10&api_key=${usdaApiKey}`
+      const fallbackResponse = await fetch(fallbackUrl)
+
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json()
+        if (fallbackData.foods && fallbackData.foods.length > 0) {
+          console.log('USDA fallback search succeeded:', fallbackData.foods.length, 'results')
+          // Process fallback results
+          return fallbackData.foods
+            .filter((food: any) => {
+              const desc = (food.description || '').toLowerCase()
+              return !desc.includes('canned') &&
+                     !desc.includes('frozen') &&
+                     !desc.includes('dried') &&
+                     !desc.includes('cooked')
+            })
+            .slice(0, 5)
+            .map((food: any) => ({
+              source: 'usda',
+              fdc_id: food.fdcId,
+              product_name: food.description || 'Unknown',
+              brands: '',
+              image_url: null,
+              image_thumb_url: null,
+              nutrition: extractUSDANutrition(food.foodNutrients || []),
+              data_type: food.dataType,
+              scientific_name: food.scientificName || null,
+              ndb_number: food.ndbNumber || null,
+              food_code: food.foodCode || null,
+              gtin_upc: food.gtinUpc || null,
+              match_score: calculateMatchScore(fallbackTerm, food.description, '')
+            }))
+            .sort((a: any, b: any) => b.match_score - a.match_score)
+        }
+      }
+    }
+
     return []
   }
 

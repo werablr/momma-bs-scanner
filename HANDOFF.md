@@ -3,7 +3,7 @@
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
 **Purpose:** Unified household app. Current module: Scanner (barcode + AI vision data ingestion)
-**Last Updated:** December 17, 2025 (Fixed hardcoded household ID)
+**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback search)
 
 ---
 
@@ -242,6 +242,16 @@ See Master HANDOFF for full strategy.
    - **Impact:** Multi-household support now enabled for photo workflow
    - **Files:** components/PhotoCaptureScreen.js:8,11,98
 
+### ✅ **P2 - Medium Priority (Fixed December 17, 2025)**
+
+6. **AI Vision "No Matches" Problem** - ✅ **FIXED**
+   - **Problem:** `prepareUSDASearchTerm()` strips variety names (Fuji, Granny Smith) but USDA search still fails → item saved WITHOUT nutrition data
+   - **Solution:** Added two-stage USDA search with fallback to generic produce name (40 common items)
+   - **Fixed:** December 17, 2025
+   - **Flow:** "Fuji Apple" → search "fuji apple raw" (0 results) → fallback "apple raw" (results found)
+   - **Files:** supabase/functions/identify-by-photo/index.ts:142-190
+   - **Deployed:** ✅ Live on Supabase edge functions
+
 ### 🟢 **P2 - Medium Priority (This Month)**
 
 5. **No Idempotency Keys** - All edge functions
@@ -249,12 +259,6 @@ See Master HANDOFF for full strategy.
    - **Impact (Current Scale):** Low (rare with 2 users)
    - **Fix:** Add UUID-based idempotency key tracking
    - **Effort:** Medium (2-3 hours)
-
-6. **AI Vision "No Matches" Problem** - `identify-by-photo:178-189`
-   - **Problem:** `prepareUSDASearchTerm()` strips variety names (Fuji, Granny Smith) but USDA search still fails → item saved WITHOUT nutrition data
-   - **Impact:** Users get "No Matches" even for valid produce
-   - **Fix:** Try variety-specific search first, fall back to generic
-   - **Effort:** Low (1 hour)
 
 ### 🔵 **P3-P5 - Defer (Code Quality, Not Blocking)**
 
@@ -733,5 +737,5 @@ SELECT cron.schedule(
 **Performance:** B- (sequential APIs slow scans)
 **Security:** A (RLS, JWT, service role correct)
 **Last Audit:** November 28, 2025
-**Last Updated:** December 14, 2025 (Photo workflow complete)
-**Next Review:** After P0/P1 fixes (December 15, 2025)
+**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback search)
+**Next Review:** December 31, 2025
