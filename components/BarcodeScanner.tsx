@@ -244,7 +244,7 @@ export default function BarcodeScannerV2({
         <View style={styles.homeScreen}>
           <View style={styles.homeHeader}>
             <ControlTowerMark
-              size={54}
+              size={80}
               emphasis={{ emphasize: [0, 1, 3, 4, 6, 7] }}
               frameColor={Theme.color.frameScanner}
             />

@@ -316,6 +316,13 @@ type ControlTowerMarkProps = {
  * - Outer dark frame with micro-depth
  * - 3x3 tiles inside
  * - Optional emphasis rules to create module variants without changing the system
+ *
+ * Approved settings from icon-generator.html:
+ * - frameRadius: 18px (at 1024px)
+ * - tileRadius: 14px (at 1024px)
+ * - tileGapPercent: 0.065
+ * - tileOpacity: 1.0
+ * - dimOpacity: 0.70
  */
 export function ControlTowerMark({
   size = 72,
@@ -328,9 +335,7 @@ export function ControlTowerMark({
   const tileGap = Math.round(size * tileGapPercent);
   const tileSize = Math.round((size - tileGap * 4) / 3);
 
-  // Match icon generator settings exactly
-  // Your settings: frameRadius at 1024px = 18, tileRadius at 1024px = 14
-  // Scale proportionally to actual size
+  // Approved settings from icon-generator.html (lines 354-383)
   const scale = size / 1024;
   const frameRadius = 18 * scale;
   const tileRadius = 14 * scale;
