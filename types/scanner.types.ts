@@ -83,7 +83,9 @@ export type ScannerEvent =
   | { type: 'MATCH_SELECTED'; match: Match; quantity?: number }
 
   // Manual entry
-  | { type: 'FORM_SUBMITTED'; data: ManualEntryData }
+  | { type: 'SET_MANUAL_PRODUCT_NAME'; product_name: string }
+  | { type: 'SET_MANUAL_BRAND'; brand_name?: string }
+  | { type: 'MANUAL_ENTRY_SUBMITTED' }
 
   // Common workflow steps
   | { type: 'LOCATION_SELECTED'; location_id: string }
@@ -182,9 +184,6 @@ export interface AIResult {
 export interface ManualEntryData {
   food_name: string
   brand_name?: string
-  quantity: number
-  storage_location_id: string
-  expiration_date?: Date
 }
 
 export interface InventoryItem {

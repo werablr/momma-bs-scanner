@@ -86,6 +86,14 @@ export const scannerMachine = setup({
     isPhotoWorkflow: ({ context }) => {
       return context.mode === 'photo'
     },
+
+    isManualWorkflow: ({ context }) => {
+      return context.mode === 'manual'
+    },
+
+    hasManualEntry: ({ context }) => {
+      return context.manual_entry !== null && context.manual_entry.food_name.length > 0
+    },
   },
 
   // ==========================================================================
@@ -114,6 +122,28 @@ export const scannerMachine = setup({
       plu_code: ({ event }) => {
         if (event.type !== 'PLU_ENTERED') return null
         return event.plu_code
+      },
+    }),
+
+    // Store manual entry product name
+    storeManualProductName: assign({
+      manual_entry: ({ context, event }) => {
+        if (event.type !== 'SET_MANUAL_PRODUCT_NAME') return context.manual_entry
+        return {
+          food_name: event.product_name,
+          brand_name: context.manual_entry?.brand_name || undefined,
+        }
+      },
+    }),
+
+    // Store manual entry brand
+    storeManualBrand: assign({
+      manual_entry: ({ context, event }) => {
+        if (event.type !== 'SET_MANUAL_BRAND') return context.manual_entry
+        return {
+          food_name: context.manual_entry?.food_name || '',
+          brand_name: event.brand_name,
+        }
       },
     }),
 
@@ -208,6 +238,18 @@ export const scannerMachine = setup({
       product: ({ event }) => {
         if (event.type !== 'MATCH_SELECTED') return null
         return event.match
+      },
+    }),
+
+    // Store product from manual entry data (for success screen display)
+    storeManualProduct: assign({
+      product: ({ context }) => {
+        if (!context.manual_entry) return null
+        return {
+          name: context.manual_entry.food_name,
+          brand_name: context.manual_entry.brand_name || null,
+          product_name: context.manual_entry.food_name,
+        }
       },
     }),
 
@@ -379,14 +421,19 @@ export const scannerMachine = setup({
       console.log('[callStep2] Starting Step 2 API call...')
       console.log('[callStep2] scan_id:', context.scan_id)
       console.log('[callStep2] expiration_date:', context.expiration_date)
+      console.log('[callStep2] expiration_date type:', typeof context.expiration_date)
+      console.log('[callStep2] expiration_date instanceof Date:', context.expiration_date instanceof Date)
 
-      // Handle expiration_date which could be Date, string, or null/undefined
+      // Handle expiration_date which could be Date, string, or serialized object
       let extractedDate = null
       if (context.expiration_date) {
         if (context.expiration_date instanceof Date) {
           extractedDate = context.expiration_date.toISOString()
         } else if (typeof context.expiration_date === 'string') {
           extractedDate = context.expiration_date
+        } else if (typeof context.expiration_date === 'object') {
+          // Date may have been serialized to object - try to convert back
+          extractedDate = new Date(context.expiration_date as any).toISOString()
         }
       }
 
@@ -598,6 +645,43 @@ export const scannerMachine = setup({
       if (error) throw error
     }),
 
+    // Manual entry workflow - Call edge function (consistent with barcode workflow)
+    createManualItem: fromPromise(async ({ input }) => {
+      const { context } = input as { context: ScannerContext }
+
+      console.log('[createManualItem] Calling scanner-ingest with workflow: manual...')
+      console.log('[createManualItem] Manual entry:', context.manual_entry)
+      console.log('[createManualItem] Storage location:', context.storage_location_id)
+      console.log('[createManualItem] Idempotency key:', context.idempotency_key)
+
+      if (!context.manual_entry) {
+        throw new Error('No manual entry data')
+      }
+
+      const { data, error } = await supabase.functions.invoke('scanner-ingest', {
+        body: {
+          workflow: 'manual',
+          product_name: context.manual_entry.food_name,
+          brand_name: context.manual_entry.brand_name || null,
+          storage_location_id: context.storage_location_id,
+          idempotency_key: context.idempotency_key,
+        },
+      })
+
+      if (error) {
+        console.error('[createManualItem] ❌ Error from edge function:', error)
+        throw error
+      }
+
+      if (!data || !data.success) {
+        console.error('[createManualItem] ❌ Failed:', data)
+        throw new Error(data?.error || 'Failed to create manual item')
+      }
+
+      console.log('[createManualItem] ✅ Manual item created:', data)
+      return { item_id: data.scan_id, success: true }
+    }),
+
     // Cleanup
     deletePendingItem: fromPromise(async ({ input }): Promise<void> => {
       const { context } = input as { context: ScannerContext }
@@ -724,8 +808,10 @@ export const scannerMachine = setup({
               target: '#scanner.scanning.photo',
               actions: { type: 'setMode', params: { mode: 'photo' } },
             },
-            // Phase 3+: Add other workflow entry points
-            // START_MANUAL_ENTRY: ...
+            START_MANUAL_ENTRY: {
+              target: '#scanner.scanning.manual',
+              actions: { type: 'setMode', params: { mode: 'manual' } },
+            },
           },
         },
       },
@@ -769,8 +855,21 @@ export const scannerMachine = setup({
           },
         },
 
-        // Phase 3+: Add other scanning modes
-        // manual: ...
+        manual: {
+          on: {
+            SET_MANUAL_PRODUCT_NAME: {
+              actions: 'storeManualProductName',
+            },
+            SET_MANUAL_BRAND: {
+              actions: 'storeManualBrand',
+            },
+            MANUAL_ENTRY_SUBMITTED: {
+              target: '#scanner.processing.selectingLocation',
+              guard: 'hasManualEntry',
+            },
+            CANCEL: '#scanner.ready.idle',
+          },
+        },
       },
     },
 
@@ -874,6 +973,11 @@ export const scannerMachine = setup({
                 guard: 'isPhotoWorkflow',
                 actions: 'storeLocation',
               },
+              {
+                target: 'creatingManualItem',
+                guard: 'isManualWorkflow',
+                actions: 'storeLocation',
+              },
             ],
             CANCEL: '#scanner.ready.idle',
           },
@@ -887,6 +991,25 @@ export const scannerMachine = setup({
             onDone: {
               target: 'capturingExpiration',
               actions: 'storeScanId',
+            },
+            onError: {
+              target: '#scanner.error.retryable',
+              actions: [
+                'storeError',
+                { type: 'setRetryState', params: { state: 'processing.selectingLocation' } },
+              ],
+            },
+          },
+        },
+
+        // Manual workflow - Create inventory item directly
+        creatingManualItem: {
+          invoke: {
+            src: 'createManualItem',
+            input: ({ context }) => ({ context }),
+            onDone: {
+              target: 'capturingExpiration',
+              actions: ['storeManualProduct', 'storeScanId'],
             },
             onError: {
               target: '#scanner.error.retryable',

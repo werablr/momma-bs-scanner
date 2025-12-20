@@ -568,7 +568,7 @@ serve(async (req) => {
           brand_name: brand_name || null,
           expiration_date: expiration_date,
           notes: notes || null,
-          status: 'active',
+          status: 'pending', // Will be set to active after expiration capture
           volume_remaining: 100, // Default to 100% for manual entries
         })
         .select()

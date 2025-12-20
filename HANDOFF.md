@@ -2,8 +2,8 @@
 
 **App:** React Native (iPhone)
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
-**Purpose:** Unified household app. Current module: Scanner (barcode + AI vision data ingestion)
-**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback + idempotency keys)
+**Purpose:** Unified household app. Current module: Scanner (barcode + PLU + AI Vision)
+**Last Updated:** December 18, 2025
 
 ---
 
@@ -12,335 +12,94 @@
 **At conversation start, ask: "Am I Desktop Claude or Code Claude?"**
 
 ### Brian (Human)
-- **Final approval authority** - All decisions require Brian's sign-off
-- **Product owner** - Defines requirements and priorities
-- **Human in the loop** - Can override any Claude decision
-- **Sets direction** - Decides what gets built and when
+- Final approval authority
+- Product owner
+- Can override any Claude decision
 
 ### Desktop Claude (Supervisor)
-- **Controls optempo** - Sets pace, decides when to proceed
-- **Provides guardrails** - Enforces philosophy, prevents deviation
-- **Reviews work** - Validates Code Claude's output before approval
-- **Makes go/no-go decisions** - Approves phase transitions
-- **Updates documentation** - Maintains HANDOFF.md files
-- **Does NOT write code** - Only reviews, directs, and documents
-- **Reports to Brian** - Escalates decisions requiring human judgment
+- Controls optempo, provides guardrails
+- Reviews work, makes go/no-go decisions
+- Updates HANDOFF.md files
+- Does NOT write code
 
 ### Code Claude (Executor)
-- **Writes code** - All implementation work
-- **Runs tests** - Executes test plans, reports results
-- **Follows instructions** - Executes tasks as directed by Desktop Claude
-- **Reports status** - Provides detailed results after each action
-- **Does NOT make architectural decisions** - Proposes, doesn't decide
-- **Reports to Desktop Claude** - Escalates blockers and questions
-
-**Code Claude is NOT a blind follower:**
-- **Finds gaps** - Actively looks for missing requirements, edge cases, incomplete specs
-- **Catches bugs** - Flags issues in existing code or proposed changes
-- **Spots conflicts** - Identifies contradictions in requirements or design
-- **Guards philosophy** - Calls out deviations from Core Tenets
-- **Can pause production** - Has authority to stop and discuss if something feels wrong
-- **Always asks questions** - Never proceeds with uncertainty; clarification is expected
+- Writes code, runs tests
+- Reports status, escalates blockers
+- Does NOT make architectural decisions
+- Finds gaps, catches bugs, guards philosophy
+- Can pause and ask questions
 
 ---
 
-## Unified App Architecture (December 14, 2025)
+## Dev Server Policy
 
-This app is now "Momma B's Household" — a unified app containing modules.
+**Dev servers are managed via DevDash** - `/Users/macmini/Desktop/DevDash/`
 
-**Current Modules:**
-- Scanner (barcode + PLU + photo workflows)
-
-**Future Modules:**
-- Pantry (native rewrite of web app)
-- Security
-- Entertainment
-- Kiosks
-
-**Structure:**
-- Home screen: Module selector
-- Each module lives in its own folder
-- Shared auth, shared Supabase backend
-- One codebase, one build, one TestFlight
-
-See Master HANDOFF for full strategy.
-
----
-
-## Dev Server Policy (Updated December 13, 2025)
-
-**Dev servers are managed via DevDash** - a native macOS app built in Xcode.
-
-**Location:** `/Users/macmini/Desktop/DevDash/`
-
-**Port Assignment:** Scanner runs on port **8082**
+**Port:** 8082
 
 **Code Claude Rules:**
-- **NEVER** start dev servers autonomously
-- **NEVER** use `run_in_background: true` for any dev server
-- If dev server is needed, ask Brian: "Please start the Scanner dev server via DevDash"
-- Wait for confirmation before proceeding with tests
-
-**DevDash Features:**
-- Start/Stop/Force Start/Restart controls
-- Health probes (PID, Port, HTTP, Metro)
-- Process group management (no orphaned processes)
-- Live log streaming
+- NEVER start dev servers autonomously
+- NEVER use `run_in_background: true` for dev servers
+- Ask Brian: "Please start the Scanner dev server via DevDash"
+- Wait for confirmation before testing
 
 ---
 
-## Current State - PHASE 3: Device Testing COMPLETE ✅
+## Architecture
 
-### ✅ PHASE 3 COMPLETE: Device Testing (Dec 3, 2025)
+**Stack:** React Native + Expo + XState v5 + Supabase
 
-**Barcode Workflow (Device Tested):**
-- ✅ 5 scans completed successfully on physical iPhone
-- ✅ Error handling validated (transient network error recovered via retry)
-- ✅ Multiple storage locations tested (Pantry, Freezer, Above Air Fryer, Above Freezer, Basket)
-- ✅ All items saved with `status: active`
-- ✅ State machine working correctly (scan → location → API → expiration → review → complete)
-- ✅ No critical bugs or crashes
+**Key Files:**
+- `machines/scanner.machine.ts` - State machine (687 lines, 19 tests)
+- `components/BarcodeScanner.tsx` - Main UI (XState-based)
+- `supabase/functions/scanner-ingest/` - Barcode API edge function
+- `supabase/functions/identify-by-photo/` - AI Vision edge function
+- `supabase/functions/lookup-plu/` - PLU lookup edge function
+- `contexts/AuthContext.tsx` - Authentication
+- `theme/MommaBsHouseholdTheme.tsx` - Design system
 
-**Test Results (Dec 3, 2025):**
-1. ✅ Hormel Hot Chili (barcode: 0037600233521) - Pantry
-2. ✅ Libby's Vienna Sausage (barcode: 0039000086639) - Above Air Fryer (after retry)
-3. ✅ GOYA Refried Beans (barcode: 0041331029018) - Above Freezer
-4. ✅ Grandma's Original Molasses (barcode: 0072400711244) - Basket
-5. ✅ Crisco Vegetable Oil (barcode: 0196005708338) - Freezer
-
-**PLU Workflow (Implementation Complete, Device Testing Pending):**
-- ✅ State machine integration (`machines/scanner.machine.ts`)
-  - `lookupPLU` actor → calls `lookup-plu` edge function
-  - `createPLUItem` actor → creates inventory item directly (no Step 1/Step 2)
-  - Auto-select single match, selection UI for multiple matches
-- ✅ PLU entry UI (`BarcodeScanner.tsx`)
-  - PLU input screen with 4-5 digit validation
-  - Match selection screen for multiple USDA results
-- ✅ `lookup-plu` edge function deployed (queries plu_codes table)
-- ⏳ Device testing: Pending (5 scans required)
-
-**PLU Database (COMPLETE):**
-- ✅ **1,545 PLU codes** imported to Supabase `plu_codes` table
-- ✅ **ALL 20 IFPS columns** captured per "capture everything" philosophy
-- ✅ **1,235 PLU codes (79%)** have USDA nutrition mappings
-- ✅ **310 PLU codes (21%)** without USDA data (valid - not in SR Legacy)
-- ✅ Handles duplicate PLU codes (same code, different size/restrictions)
-- ✅ Edge function returns all variants for selection
-- ✅ RFC 4180 CSV parsing (handles multi-line quoted fields)
-
-**Photo Workflow (Complete December 14, 2025):**
-- ✅ Implementation complete and tested
-
-**Design:**
-1. User taps "Scan by Photo"
-2. Camera opens, user takes photo
-3. Upload photo to Supabase Storage
-4. Send photo to GPT-4o with prompt: *"Identify this produce item and return its 4-5 digit PLU code. Only return the PLU code number, nothing else. If uncertain, return your best guess."*
-5. GPT-4o returns PLU code (e.g., "4131")
-6. Call existing `lookup-plu` edge function with that code
-7. If single match → auto-select, proceed to location/expiration
-8. If multiple matches → user selects
-9. If no match → show "Not found" with option for manual entry
-10. Complete flow same as PLU workflow
-
-**Reuses:**
-- `lookup-plu` edge function (unchanged)
-- PLU → USDA crosswalk (already in database)
-- Match selection UI (from PLU workflow)
-- Location/expiration/review screens (from barcode workflow)
-
-**Built:**
-- ✅ `identify-photo` edge function (GPT-4o → PLU code)
-- ✅ Photo capture UI in XState
-- ✅ State machine states for photo workflow
-- ✅ USDA nutrition extraction fixed (nutrient.id format)
-
-### ✅ PHASE 2 COMPLETE: XState State Machine (Nov 29, 2025)
-
-**Scanner (BarcodeScanner.tsx):**
-- ✅ Zero useState for workflow state (replaced 21 hooks with single state machine)
-- ✅ XState v5 with 19/19 passing tests
-- ✅ Real Supabase API integration (Step 1, Step 2, finalization)
-- ✅ End-to-end tested on device (barcode workflow)
-- ✅ Error handling (retry/cancel with cleanup)
-- ✅ Crash recovery (interrupted state with resume/discard)
-- ✅ Comprehensive logging for debugging
-- ✅ **Legacy BarcodeScanner.js removed December 13, 2025**
-
-### Working ✅
-- Authentication & RLS (secure login, household-based isolation)
-- Barcode scanning (UPC/EAN via camera)
-- PLU code entry (manual entry for produce stickers)
-- ✅ **Photo workflow (implemented December 14, 2025)** - AI Vision identifying PLU codes
-- Multi-API integration (Open Food Facts + UPCitemdb + USDA - **parallelized**)
-- Photo uploads (Supabase Storage)
-- Manual entry fallback
-- OCR + manual date picker for expiration
-- Edge function security (JWT auth, CORS restricted)
-
-### Architecture Grade: **A-** (Upgraded Nov 29, 2025)
-**Strengths:** State machine architecture, testable, type-safe, feature-complete
-**Weaknesses:** Success screen placeholder, secondary workflows deferred to Phase 3
-
-### 🚨 **CRITICAL WARNING: DO NOT FIX BUGS IN BarcodeScanner.js**
-
-**Problem:** 1,294 lines with 21 useState hooks = invisible state coupling
-- **2^21 = 2,097,152 possible state combinations**
-- Only a handful are valid
-- Every change breaks something else (hidden dependencies)
-- **This is not fixable by being more careful** - the architecture makes correctness impossible
-
-**Solution:** Stabilize WITHOUT touching BarcodeScanner.js, then rewrite with XState
-
-**Allowed Changes:**
-- ✅ Database migrations (cleanup jobs)
-- ✅ Edge function improvements (parallel APIs, idempotency)
-- ✅ Wrapper components (error boundary around BarcodeScanner)
-- ❌ Any changes to BarcodeScanner.js logic or state
+**Workflows:**
+1. **Barcode** - Scan → Location → API lookup → Expiration → Review → Save
+2. **PLU** - Enter code → USDA lookup → Location → Expiration → Review → Save
+3. **Photo** - Take photo → GPT-4o identifies PLU → USDA lookup → Save
+4. **Manual** - Type product info → Save
 
 ---
 
-## Verified Issues (Nov 28, 2025)
+## Current State
 
-### ✅ **P0 - Critical (Fixed Nov 28, 2025)**
+### Working
+- XState state machine (replaced 21 useState monolith)
+- Barcode scanning (UPC/EAN)
+- PLU code entry (1,545 codes with USDA nutrition)
+- Photo workflow (AI Vision → PLU → USDA)
+- Multi-API integration (OFF + UPCitemdb + USDA, parallelized)
+- Idempotency keys (prevents duplicate items)
+- Authentication & RLS
+- Error boundary with crash recovery
 
-1. **Items Stuck in 'pending' Status** - ✅ FIXED
-   - **Problem:** Step 1 creates item with `status='pending'`, if Step 2 fails (network timeout, session expire), item stuck forever
-   - **Solution:** Migration `20251128000000_add_pending_cleanup_job.sql`
-   - **Result:** pg_cron job runs daily at 2am UTC, deletes items >24hrs old
-   - **Impact:** Database corruption prevented
+### Open Issues
 
-2. **Orphaned Photo Storage** - ✅ FIXED
-   - **Problem:** Photo uploads to Supabase Storage succeed, but if DB insert fails (invalid storage_location_id, RLS violation), file is orphaned forever
-   - **Solution:** Migration `20251128000001_add_orphaned_photo_cleanup.sql`
-   - **Result:** cleanup_orphaned_photos() function runs daily at 3am UTC
-   - **Impact:** Storage costs controlled
+**P2 - This Month:**
+- No real-time sync (User B must refresh to see User A's scans)
+- No pagination (loads all items)
 
-3. **Scanner Crash Recovery** - ✅ FIXED
-   - **Problem:** Component crashes leave users stuck with no recovery
-   - **Solution:** ScannerErrorBoundary.tsx wrapper component
-   - **Result:** Error boundary catches crashes, reset button allows recovery
-   - **Files:** components/ScannerErrorBoundary.tsx, app/(tabs)/index.tsx
-   - **Impact:** Users can recover from errors without app restart
-
-### ✅ **P1 - High Priority (Fixed Nov 28, 2025)**
-
-3. **Sequential API Calls** - ✅ FIXED
-   - **Problem:** UPCitemdb → OFF called sequentially, wasting 2-3 seconds per scan
-   - **Solution:** Refactored to use Promise.allSettled for parallel API calls
-   - **Result:** Both APIs called simultaneously, wait for fastest response
-   - **Files:** supabase/functions/scanner-ingest/index.ts:166-250
-   - **Impact:** 50% faster barcode scanning (4-6s → 2-3s)
-   - **Deployed:** Yes, live on Supabase edge functions
-
-### ✅ **P1 - High Priority (Fixed December 17, 2025)**
-
-4. **Hardcoded Household ID** - ✅ **FIXED**
-   - **Problem:** `const HOUSEHOLD_ID = '7c093e13-4bcf-463e-96c1-9f499de9c4f2';` in PhotoCaptureScreen.js
-   - **Solution:** Replaced with `household.id` from `useAuth()` hook
-   - **Fixed:** December 17, 2025 in PhotoCaptureScreen.js
-   - **Impact:** Multi-household support now enabled for photo workflow
-   - **Files:** components/PhotoCaptureScreen.js:8,11,98
-
-### ✅ **P2 - Medium Priority (Fixed December 17, 2025)**
-
-6. **AI Vision "No Matches" Problem** - ✅ **FIXED**
-   - **Problem:** `prepareUSDASearchTerm()` strips variety names (Fuji, Granny Smith) but USDA search still fails → item saved WITHOUT nutrition data
-   - **Solution:** Added two-stage USDA search with fallback to generic produce name (40 common items)
-   - **Fixed:** December 17, 2025
-   - **Flow:** "Fuji Apple" → search "fuji apple raw" (0 results) → fallback "apple raw" (results found)
-   - **Files:** supabase/functions/identify-by-photo/index.ts:142-190
-   - **Deployed:** ✅ Live on Supabase edge functions
-
-### ✅ **P2 - Medium Priority (Fixed December 17, 2025)**
-
-5. **No Idempotency Keys** - ✅ **FIXED**
-   - **Problem:** Network retries create duplicate inventory items; no deduplication protection
-   - **Solution:** Added idempotency_keys table with 24-hour TTL and pg_cron cleanup
-   - **Fixed:** December 17, 2025
-   - **Implementation:**
-     - Client generates UUID when location selected, persists on retry
-     - Edge function checks table before INSERT, returns cached response if key exists
-     - pg_cron cleans up expired keys daily at 4am UTC
-   - **Files:**
-     - `supabase/migrations/20251217000000_add_idempotency_keys.sql`
-     - `supabase/functions/scanner-ingest/index.ts` (Step 1 + Manual workflow)
-     - `machines/scanner.machine.ts` (UUID generation in storeLocation)
-     - `types/scanner.types.ts` (added idempotency_key to context)
-   - **Deployed:** ✅ Migration pushed, edge function deployed
-
-### 🟢 **P2 - Medium Priority (This Month)**
-
-### 🔵 **P3-P5 - Defer (Code Quality, Not Blocking)**
-
-7. **Monolithic Component** - `BarcodeScanner.js` (1,294 lines, 21 useState hooks)
-   - **Verified:** Exactly 1,294 lines, 21 useState hooks found
-   - **Impact:** Hard to debug, state consistency issues, unmaintainable
-   - **Fix:** Refactor to XState or reducer-based state machine
-   - **Effort:** High (1-2 weeks)
-   - **Priority:** P4 (defer until stable)
-
-8. **Missing TypeScript** - All components
-   - **Impact:** Higher risk of runtime errors, harder to refactor
-   - **Fix:** Gradual migration to TypeScript
-   - **Effort:** High (2-3 weeks)
-   - **Priority:** P4 (defer)
-
-9. **PLU Database Incomplete** - `lookup-plu:10-28`
-   - **Problem:** Hardcoded ~50 PLU codes, IFPS has 1000+
-   - **Impact:** Missing PLU codes force manual entry
-   - **Fix:** Import IFPS database into Supabase table
-   - **Effort:** Medium (3-4 hours)
-   - **Priority:** P5 (nice to have)
+**P3+ - Deferred:**
+- Manual entry workflow incomplete
+- Full TypeScript migration
 
 ---
 
-## Workflows
+## Commands
 
-### 1. Barcode (Packaged Goods)
-1. Scan barcode → select storage location
-2. Edge function queries: Product Catalog (cache) → **UPCitemdb + OFF in parallel** (P1 fix needed)
-3. OCR expiration date (or manual entry)
-4. Review screen → save to database
-
-### 2. PLU Code Entry (Produce Stickers)
-1. "Enter PLU Code" → user enters 4-5 digit code from produce sticker
-2. Edge function (`lookup-plu`) maps PLU to USDA search term (e.g., 4011 → "banana raw")
-   - **Note:** Hardcoded mapping for ~50 common items only
-   - **Limitation:** PLU codes are IFPS industry standards, not in USDA database
-3. USDA FoodData Central returns nutrition matches
-4. User selects match → storage location + expiration
-5. Generates `PLU-{code}` barcode
-
-### 3. AI Vision (Produce/Bulk)
-1. "Scan by Photo" → camera captures image
-2. OpenAI GPT-4 Vision identifies item
-3. USDA + Open Food Facts searched **sequentially** (should be parallel)
-4. User selects match → storage location + expiration
-5. Generates `PHOTO-{timestamp}` barcode
-
-### 4. Manual Entry
-- User types product name, brand, details
-- Generates `MANUAL-{timestamp}` barcode
-
----
-
-## Deployment
-
-**Daily Development:**
 ```bash
+# Development (ask Brian to start via DevDash)
 cd /Users/macmini/Desktop/momma-bs-scanner
-npx expo start --dev-client
-```
 
-**Native Rebuild (permissions, native modules):**
-```bash
+# Native rebuild (permissions, native modules)
 eas build --platform ios --profile development
-```
-Never use `npx expo run:ios` - CocoaPods fails
 
-**Deploy Edge Functions:**
-```bash
+# Deploy edge functions
 supabase functions deploy scanner-ingest
 supabase functions deploy identify-by-photo
 supabase functions deploy lookup-plu
@@ -348,405 +107,21 @@ supabase functions deploy lookup-plu
 
 ---
 
-## TestFlight
-- App Store Connect configured (App ID: 6754896169)
-- Privacy policy: https://werablr.github.io/momma-bs-scanner/PRIVACY_POLICY.md
-- Internal tester: werablr@gmail.com
-
----
-
-## Troubleshooting
-
-**Metro Won't Auto-Connect:**
-- Tap "Enter URL manually" → `192.168.0.211:8081`
-- Fix: Rebuild with EAS (permissions in app.json already added)
-
-**Expected Behaviors (Not Bugs):**
-- Product not found: Normal for QR codes, non-UPC barcodes
-- OCR fails: Expected for embossed/stamped text
-- Manual entry needed: By design for items without barcodes
-
-**AI Vision Debug:**
-- Check `edge_function_logs` table for `identify-by-photo` logs
-- Items with missing nutrition: `SELECT * FROM inventory_items WHERE data_sources IS NULL AND barcode LIKE 'PHOTO-%'`
-- Working photo scans have `usda_*` fields populated from USDA search results
-
----
-
-## Verified Priority Roadmap (Nov 28, 2025)
-
-### **Week 1: P0 Critical Fixes** ✅ COMPLETE
-**Goal:** Prevent data corruption and storage bloat
-
-| Priority | Issue | Effort | Files | Status |
-|----------|-------|--------|-------|--------|
-| P0 | Add cleanup job for stuck pending items | Low | Migration 20251128000000 | ✅ |
-| P0 | Fix orphaned photo storage | Medium | Migration 20251128000001 | ✅ |
-| P0 | Add error boundary for crash recovery | Low | ScannerErrorBoundary.tsx | ✅ |
-
-**Completed:** November 28, 2025
-
-### **Week 2: P1 High-Value Improvements** ✅ 2/3 COMPLETE
-**Goal:** Quick wins for UX and best practices
-
-| Priority | Issue | Effort | Files | Status |
-|----------|-------|--------|-------|--------|
-| P1 | Parallelize API calls (UPC + OFF) | Low | scanner-ingest/index.ts:166-250 | ✅ |
-| P1 | Add Sentry error tracking | Low | app/_layout.tsx, ScannerErrorBoundary.tsx | ✅ |
-| P1 | Remove hardcoded household ID | Low | BarcodeScanner.js:42 | ⚠️ DEFERRED |
-
-**Completed:** November 29, 2025
-- Parallelized API calls (scanner-ingest edge function using Promise.allSettled)
-- Sentry installed (@sentry/react-native v7.7.0, configured in app/_layout.tsx)
-- Error boundary integration (ScannerErrorBoundary.tsx sends errors to Sentry)
-
-**Deferred:** Remove hardcoded household ID (requires BarcodeScanner.js changes, wait for state machine rewrite)
-
-### **Month 1-2: P2 Quality Improvements**
-**Goal:** Improve data quality and prepare for scale
-
-| Priority | Issue | Effort | Files |
-|----------|-------|--------|-------|
-| P2 | Add idempotency keys | Medium | scanner-ingest, identify-by-photo |
-| P2 | Fix AI Vision variety names | Low | identify-by-photo:178-189 |
-| P2 | Add request deduplication | Medium | Multiple locations |
-
-### **Week 3-4: State Machine Rewrite** 🟡 IN PROGRESS
-**Goal:** Replace BarcodeScanner.js with XState state machine
-
-#### Phase 1: Machine Implementation ✅ COMPLETE
-- ✅ Install XState v5 and implement scanner state machine (Nov 29)
-- ✅ Write comprehensive unit tests (19/19 passing)
-- ✅ Refactor to XState v5 patterns (inline guards for invoke completions)
-- ✅ Create React Native mocks for Jest testing
-
-#### Phase 2: UI Integration ✅ COMPLETE (December 13, 2025)
-- ✅ Created BarcodeScanner.tsx with useMachine integration
-- ✅ Zero useState hooks for workflow state
-- ✅ All UI derived from state.matches()
-- ✅ Camera flow (permissions, barcode detection)
-- ✅ Processing flow (location, expiration, review)
-- ✅ Error & complete states
-- ✅ Device testing and verification complete
-- ✅ **Legacy BarcodeScanner.js removed** (1,294 lines, 21 useState hooks)
-- ✅ **Feature flag removed** (state machine now always active)
-
-#### Phase 3: Additional Workflows ✅ COMPLETE
-- ✅ PLU workflow (implemented and tested)
-- ✅ Photo workflow (implemented December 14, 2025)
-- ⏳ Manual entry workflow (deferred)
-- ✅ Crash recovery (implemented)
-
-**Files:**
-- machines/scanner.machine.ts (687 lines, tested)
-- machines/__tests__/scanner.machine.test.ts (709 lines, 19 tests)
-- components/BarcodeScanner.tsx (XState-based, production)
-
-### **Deferred: P3-P5 (High Effort, Low Urgency)**
-- P5: Import IFPS PLU database (Medium effort)
-- P5: Add Vitest + React Testing Library (High effort)
-- P5: Add Playwright E2E tests (High effort)
-
----
-
-## Database Optimization
-
-### ✅ Composite Indexes (Already Added Nov 27)
-```sql
--- Verified as existing
-CREATE INDEX idx_inventory_household_status ON inventory_items(household_id, status);
-CREATE INDEX idx_inventory_household_location ON inventory_items(household_id, storage_location_id);
-CREATE INDEX idx_inventory_household_barcode ON inventory_items(household_id, barcode);
-CREATE INDEX idx_inventory_pending_created ON inventory_items(status, created_at) WHERE status = 'pending';
-```
-
-### ❌ Cleanup Job Needed (P0)
-```sql
--- Add to pg_cron (missing)
-SELECT cron.schedule(
-  'cleanup-stuck-pending-items',
-  '0 2 * * *',  -- Daily at 2am
-  $$
-    DELETE FROM inventory_items
-    WHERE status = 'pending'
-      AND created_at < NOW() - INTERVAL '24 hours'
-  $$
-);
-```
-
-### ❌ Photo Cleanup Function (P0 Alternative)
-```sql
--- Option: Scheduled cleanup of orphaned photos
-CREATE FUNCTION cleanup_orphaned_photos()
-RETURNS INTEGER AS $$
-DECLARE
-  deleted_count INTEGER := 0;
-BEGIN
-  -- Delete photos not referenced in inventory_items
-  DELETE FROM storage.objects
-  WHERE bucket_id = 'user-food-photos'
-    AND name NOT IN (
-      SELECT photo_thumb FROM inventory_items WHERE photo_thumb IS NOT NULL
-      UNION
-      SELECT photo_highres FROM inventory_items WHERE photo_highres IS NOT NULL
-    );
-
-  GET DIAGNOSTICS deleted_count = ROW_COUNT;
-  RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql;
-
--- Schedule daily cleanup
-SELECT cron.schedule(
-  'cleanup-orphaned-photos',
-  '0 3 * * *',  -- Daily at 3am
-  'SELECT cleanup_orphaned_photos();'
-);
-```
-
----
-
-## Code Quality Metrics (Verified)
-
-**BarcodeScanner.js:**
-- Lines: 1,294 (verified with `wc -l`)
-- useState hooks: 21 (verified with `grep -c`)
-- Complexity: Very High (multiple nested modals, state management)
-- TypeScript: No
-- Test Coverage: 0%
-
-**Edge Functions:**
-- Lines: ~500 each (scanner-ingest, identify-by-photo)
-- TypeScript: Yes ✅
-- Error handling: Partial (logs to database)
-- Rate limiting: No
-- Idempotency: No
-
----
-
-## Next Actions (DO NOT TOUCH BarcodeScanner.js)
-
-### **Week 1: Stabilize (P0 - Database & Wrapper Only)** ✅ COMPLETE
-1. ✅ Add pg_cron job for stuck pending items (migration)
-2. ✅ Add orphaned photo cleanup function (migration)
-3. ✅ Wrap BarcodeScanner with ErrorBoundary (wrapper component)
-4. ✅ Add reset button to error boundary
-
-**Completed:** November 28, 2025 - Data integrity protected without touching fragile code
-
-### **Week 2: Edge Function Improvements (P1 - NOT BarcodeScanner.js)** ✅ 2/3 COMPLETE
-1. ✅ Parallelize API calls in scanner-ingest edge function (Promise.allSettled)
-2. ✅ Add Sentry error tracking (monitoring only)
-3. ❌ Add idempotency keys to edge functions (P2 - deferred)
-
-**Completed:** November 29, 2025
-- 50% faster barcode scanning (4-6s → 2-3s) without touching BarcodeScanner.js
-- Full error tracking enabled (@sentry/react-native, app/_layout.tsx, ScannerErrorBoundary.tsx)
-
-### **Week 3: Design State Machine (Planning, No Code)** ✅ COMPLETE
-1. ✅ Map all Scanner states (idle, scanning, reviewing, etc.)
-2. ✅ Map all events (SCAN, SELECT_LOCATION, CONFIRM, etc.)
-3. ✅ Map valid transitions (state diagram)
-4. ✅ Review design (Desktop Claude peer review)
-
-**Completed:** November 29, 2025
-- `/Users/macmini/Desktop/docs/SCANNER_STATE_MACHINE_DESIGN_V3.1.md`
-- All 4 workflows mapped (barcode, PLU, photo, manual)
-- All implementation bugs fixed (photo workflow, retry state, async cleanup)
-- Approved by Desktop Claude - ready for implementation
-
-### **Week 4-5: Rewrite Scanner (XState)** 🟡 IN PROGRESS
-
-**Phase 1: Core Infrastructure (Week 4)** - In Progress
-1. ✅ Install XState v5 (`xstate@5`)
-2. ✅ Create type definitions (`types/scanner.types.ts`)
-3. ✅ Create state machine (`machines/scanner.machine.ts`)
-4. ✅ Add Jest testing framework
-5. 🟡 Write unit tests for barcode workflow (5/15 tests written)
-
-**Completed:** November 29, 2025
-- XState v5 installed
-- Complete TypeScript types for context, events, states
-- State machine with barcode workflow (camera permissions → scan → review → complete)
-- All guards, actions, actors defined per V3.1 design
-- Cleanup state for async deletePendingItem (V3.1 fix)
-- **Explicit return types on all actors** (clearPendingScan, updateStatus, flagItemForReview, deletePendingItem: Promise<void>)
-- Jest + ts-jest configured
-- First 5 tests written (initial state, permissions flow, happy path start)
-
-**Next:** Complete remaining 10 unit tests, verify all pass, then UI integration
-
-**Phase 2-4:** (Not started)
-2. ❌ Rebuild Scanner UI against machine (module by module)
-3. ❌ Replace BarcodeScanner.js
-4. ❌ Remove old code
-5. ✅ THEN fix hardcoded household ID (safe after rewrite)
-
----
-
-## Dev Server Details
-
-### Network
-- Mac mini IP: `192.168.0.211`
-- Port: `8082` (changed from 8081 on December 13, 2025)
-- Flags: `--dev-client --host lan`
-
-### Management
-- Managed via DevDash (see Dev Server Policy above)
-- No manual launchctl commands needed
-
----
-
-## Recent Updates (December 7, 2025)
-
-### ✅ FIXED: Race Condition in AuthContext (Commit 6ad9da7)
-
-**Problem:** App stuck on loading screen due to race condition
-- `setUser()` triggered re-render immediately
-- `loadHousehold()` was async and completed after loading state was set to false
-- HomeScreen rendered with `user = valid`, `household = null`, `loading = false`
-- App never exited loading state
-
-**Solution:**
-- Added `isMounted` flag to prevent state updates after unmount
-- Don't set `loading = false` until BOTH user AND household are loaded
-- Ignore `TOKEN_REFRESHED` events (don't need to reload household)
-- Only reload on explicit `SIGNED_IN` / `SIGNED_OUT` events
-- Created internal `loadHouseholdInternal` to avoid duplicate loading logic
-
-**Files Changed:** `contexts/AuthContext.tsx`
-
-### ✅ ADDED: Quantity + Unit Input to Review Screen (Commit eb1884c)
-
-**Features:**
-- Quantity input field with dynamic keyboard (number-pad for 'each', decimal-pad for 'lb'/'oz')
-- Unit picker buttons: each / lb / oz
-- Quick quantity buttons: 1, 2, 3, 4, 5
-- Defaults: quantity=1, unit='each'
-
-**Files Changed:**
-- `components/EditableReview.js` - Added quantity section UI and logic
-- `supabase/migrations/20251207000000_add_quantity_unit.sql` - Database migration
-
-**Database:**
-- Added `quantity_unit` column (TEXT, default 'each')
-- Existing `quantity` column already exists (numeric)
-
-### ✅ FIXED: Product Data Field Name Fallbacks (Commit cd7c290)
-
-**Problem:** Different API sources return different field names
-**Solution:** Added fallbacks in EditableReview:
-- `name || product_name || food_name`
-- `brand_name || brand || brands`
-
-### ✅ NEW: Quantity Input Redesign (December 9, 2025)
-
-**UI Changes (EditableReview.js):**
-- Replaced text input with native scroll pickers using `@react-native-picker/picker`
-- Mode toggle: `each` | `weight` buttons
-- **Each mode**: Single scroll picker (range 1-64 items)
-- **Weight mode**: Dual scroll pickers (lb: 0-64, oz: 0-15)
-
-**Database Fields:**
-- `quantity` (integer): Count for "each" mode, pounds for "weight" mode
-- `quantity_oz` (integer): Ounces portion (0-15) for "weight" mode
-- `quantity_unit` (text): 'each' or 'weight'
-
-**Save Logic:**
-- Each mode: `quantity = selected value`, `quantity_oz = 0`, `quantity_unit = 'each'`
-- Weight mode: `quantity = lb value`, `quantity_oz = oz value`, `quantity_unit = 'weight'`
-
-**Package Added:** `@react-native-picker/picker` (native module, requires EAS rebuild)
-
-### ✅ EAS Organization Migration (December 9, 2025)
-
-**Changed (app.json):**
-- Owner: `werablr` → `momma-bs-household`
-- Removed old `projectId` (will regenerate on next build)
-- **Reason**: Move to organization with paid EAS plan
-
-**Next Build:**
-- EAS will prompt to link project to `momma-bs-household` org
-- New projectId will be generated and saved to app.json
-
-### ✅ Associated Domains Setup (December 12, 2025)
-
-**Purpose:** Enable 1Password autofill for Scanner app login
-**Domain:** mommabshousehold.com
-**Association file:** https://mommabshousehold.com/.well-known/apple-app-site-association
-
-**Status:** Website deployed, association file verified ✅
-
-**Pending app.json changes** (add under `expo.ios`):
-```json
-"associatedDomains": [
-  "webcredentials:mommabshousehold.com",
-  "applinks:mommabshousehold.com"
-]
-```
-
-**Requires:** EAS rebuild after app.json changes
-
-**What This Enables:**
-- 1Password autofill in Scanner app login screen
-- Universal Links (deep linking from web to app)
-
----
-
-## Visual Design System (December 14, 2025)
-
-**Theme File:** `/theme/MommaBsHouseholdTheme.tsx`
-
-**Control Tower Visual Language:**
-- Colored frame with subtle depth
-- 3×3 grid of white tiles inside frame
-- Each module has unique frame color and emphasis pattern:
-  - Household: Blue frame (#3B7EFF), no emphasis []
-  - Scanner: Green frame (#00f900), emphasis [0, 1, 3, 4, 6, 7]
-  - Pantry: Purple frame (#8B5CF6), emphasis [0, 1, 2, 3, 4, 5]
-
-**Design Primitives:**
-- `ScreenShell` - Structured header + contained sections
-- `Section` - Contained panel with title/hint
-- `ActionButton` - Primary + ghost variants
-- `ControlTowerMark` - In-app icon component
-
-**Design Tokens:**
-- Colors: White/slate surfaces, charcoal structure, status-only accents
-- Typography: Weight + spacing hierarchy (not color)
-- Spacing: 4px base unit (xxs to xxl)
-- Radii: Frame 18px, Tile 14px, Section 16px (from icon-generator.html)
-- Shadows: Subtle authority (no playfulness)
-- Tile gap: 6.5% of icon size
-- Tile opacity: 1.0 (emphasized), 0.70 (dimmed)
-
-**Icon Generator Tool:**
-- **URL:** https://mommabshousehold-site.pages.dev/icon-generator.html
-- Interactive tool to create icon variants
-- Download 1024×1024 PNG exports
-
----
-
-## Production Checklist (Phase 1 - Unified App)
-
-**Pre-Launch Tasks:**
-- [ ] Rename app to "Momma B's Household" in app.json
-- [ ] New app icon (household-focused, not scanner-focused)
-  - **Icon Generator:** https://mommabshousehold-site.pages.dev/icon-generator.html
-  - Create Control Tower icon variants (Household, Scanner, Pantry)
-  - Download 1024×1024 PNG for app icon
-- [ ] Home screen with module selector (Scanner as first/only module)
-- [ ] Update app metadata in App Store Connect
-- [ ] Update privacy policy URL if needed
-- [ ] Final TestFlight validation with unified branding
-
----
-
-**Handoff Status:** Complete and Verified
-**Code Quality:** B (functional but needs refactor)
-**Data Integrity:** C (pending items + orphaned photos need fixes)
-**Performance:** B- (sequential APIs slow scans)
-**Security:** A (RLS, JWT, service role correct)
-**Last Audit:** November 28, 2025
-**Last Updated:** December 17, 2025 (Fixed hardcoded household ID + AI Vision fallback + idempotency keys)
-**Next Review:** December 31, 2025
+## Database
+
+**Supabase Project:** bwglyyfcdjzvvjdxxjmk
+
+**Key Tables:**
+- `inventory_items` - Active inventory
+- `inventory_history` - Archived items
+- `storage_locations` - Household locations
+- `plu_codes` - 1,545 PLU codes with USDA mappings
+- `idempotency_keys` - Deduplication (24hr TTL)
+
+**Key View:**
+- `inventory_items_display` - COALESCE logic (USER > USDA > OFF > UPC)
+
+**Scheduled Jobs (pg_cron):**
+- 2am UTC: Cleanup stuck pending items (>24hrs)
+- 3am UTC: Cleanup orphaned photos
+- 4am UTC: Cleanup expired idempotency keys
