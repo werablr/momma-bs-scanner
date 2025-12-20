@@ -424,7 +424,7 @@ export const scannerMachine = setup({
       console.log('[callStep2] expiration_date type:', typeof context.expiration_date)
       console.log('[callStep2] expiration_date instanceof Date:', context.expiration_date instanceof Date)
 
-      // Handle expiration_date which could be Date, string, or serialized object
+      // Handle expiration_date which could be Date, string, or object with .date property
       let extractedDate = null
       if (context.expiration_date) {
         if (context.expiration_date instanceof Date) {
@@ -432,8 +432,14 @@ export const scannerMachine = setup({
         } else if (typeof context.expiration_date === 'string') {
           extractedDate = context.expiration_date
         } else if (typeof context.expiration_date === 'object') {
-          // Date may have been serialized to object - try to convert back
-          extractedDate = new Date(context.expiration_date as any).toISOString()
+          // Check if it's an object with .date property (from ExpirationDateCapture)
+          const dateObj = context.expiration_date as any
+          if (dateObj.date) {
+            extractedDate = new Date(dateObj.date).toISOString()
+          } else {
+            // Try to convert object directly to Date
+            extractedDate = new Date(context.expiration_date as any).toISOString()
+          }
         }
       }
 

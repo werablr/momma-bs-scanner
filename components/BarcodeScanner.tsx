@@ -409,26 +409,27 @@ export default function BarcodeScannerV2({
       {ui.showError && (
         <View style={styles.homeScreen}>
           <View style={styles.homeContent}>
-            <Text style={styles.errorTitle}>⚠️ Error</Text>
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorTitle}>⚠️ Error</Text>
 
-            {state.context.error && (
-              <>
-                <Text style={styles.errorMessage}>
-                  {state.context.error.message}
-                </Text>
-                {state.context.error.code && (
-                  <Text style={styles.errorCode}>
-                    Code: {state.context.error.code}
-                  </Text>
-                )}
-              </>
-            )}
-
-            {state.context.barcode && (
-              <Text style={styles.errorDetails}>
-                Barcode: {state.context.barcode}
+              <Text style={styles.errorMessage}>
+                {state.context.error?.message ||
+                 (typeof state.context.error === 'string' ? state.context.error : null) ||
+                 (state.context.error ? JSON.stringify(state.context.error) : null) ||
+                 'An unexpected error occurred'}
               </Text>
-            )}
+              {state.context.error?.code && (
+                <Text style={styles.errorCode}>
+                  Code: {state.context.error.code}
+                </Text>
+              )}
+
+              {state.context.barcode && (
+                <Text style={styles.errorDetails}>
+                  Barcode: {state.context.barcode}
+                </Text>
+              )}
+            </View>
 
             {ui.showRetry && (
               <TouchableOpacity
@@ -486,20 +487,6 @@ export default function BarcodeScannerV2({
             >
               <View style={styles.buttonInner}>
                 <Text style={styles.startScanButtonText}>📱 Scan Another</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Optional: View Inventory button */}
-            <TouchableOpacity
-              style={[styles.startScanButton, styles.secondaryButton]}
-              onPress={() => {
-                // Navigate to inventory list (Phase 3 - navigation not yet implemented)
-                console.log('[Success] View Inventory button pressed (not yet implemented)')
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.buttonInner}>
-                <Text style={styles.secondaryButtonText}>📦 View Inventory</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -974,29 +961,36 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderColor: '#10E010',
     borderRadius: Theme.radius.section,
     backgroundColor: 'transparent',
   },
   scanInstruction: {
     marginTop: 30,
     fontSize: 18,
-    color: '#fff',
+    color: '#000',
     textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: '#fff',
     padding: 15,
     borderRadius: 10,
   },
   errorText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 16,
     textAlign: 'center',
   },
   // Error screen styles
+  errorContainer: {
+    backgroundColor: '#FF3B30',
+    padding: 30,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 30,
+  },
   errorTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FF3B30',
+    color: '#fff',
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -1009,13 +1003,13 @@ const styles = StyleSheet.create({
   },
   errorCode: {
     fontSize: 12,
-    color: '#888',
+    color: '#fff',
     textAlign: 'center',
     marginBottom: 20,
   },
   errorDetails: {
     fontSize: 14,
-    color: '#ccc',
+    color: '#fff',
     textAlign: 'center',
     marginVertical: 10,
   },
@@ -1029,7 +1023,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   buttonBackground: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: '#fff',
     borderRadius: 15,
     padding: 10,
   },
@@ -1053,7 +1047,7 @@ const styles = StyleSheet.create({
   // Crash recovery styles
   recoveryDetails: {
     fontSize: 14,
-    color: '#ccc',
+    color: '#000',
     marginVertical: 5,
     textAlign: 'center',
   },
@@ -1068,12 +1062,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
   overlayText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 18,
     marginTop: 20,
   },
@@ -1086,21 +1080,21 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000',
     marginBottom: 20,
     textAlign: 'center',
   },
   successProductName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#fff',
+    color: '#000',
     marginBottom: 10,
     textAlign: 'center',
     paddingHorizontal: 20,
   },
   successDetails: {
     fontSize: 16,
-    color: '#ccc',
+    color: '#000',
     marginBottom: 40,
     textAlign: 'center',
   },
@@ -1118,16 +1112,15 @@ const styles = StyleSheet.create({
   },
   // PLU Entry screen styles
   pluInput: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    padding: 20,
-    borderRadius: Theme.radius.input,
+    backgroundColor: '#fff',
+    color: '#000',
+    fontSize: 18,
+    textAlign: 'left',
+    padding: 15,
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.20)',
-    marginBottom: 30,
+    borderColor: '#10E010',
+    marginBottom: 15,
     width: '80%',
   },
   disabledButton: {
@@ -1136,72 +1129,72 @@ const styles = StyleSheet.create({
   // Match Selection screen styles
   matchSelectionContainer: {
     flex: 1,
-    backgroundColor: Theme.color.frameScanner,
+    backgroundColor: '#fff',
   },
   matchSelectionHeader: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.10)',
+    borderBottomColor: '#ddd',
   },
   matchSelectionTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000',
     marginBottom: 5,
   },
   matchSelectionSubtitle: {
     fontSize: 14,
-    color: '#ccc',
+    color: '#000',
   },
   matchItem: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#f5f5f5',
     padding: 20,
     marginHorizontal: 15,
     marginTop: 15,
     borderRadius: Theme.radius.section,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: '#ddd',
   },
   matchItemSelected: {
-    borderColor: 'rgba(255,255,255,0.40)',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderColor: '#10E010',
+    backgroundColor: '#fff',
   },
   matchItemName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: '#000',
     marginBottom: 5,
   },
   matchItemDetails: {
     fontSize: 14,
-    color: '#ccc',
+    color: '#000',
   },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.10)',
+    borderTopColor: '#ddd',
   },
   quantityLabel: {
     fontSize: 18,
-    color: '#fff',
+    color: '#000',
     marginRight: 15,
   },
   quantityInput: {
-    backgroundColor: 'rgba(0,0,0,0.30)',
-    color: '#fff',
+    backgroundColor: '#fff',
+    color: '#000',
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
+    borderColor: '#10E010',
     width: 80,
   },
   matchSelectionActions: {
