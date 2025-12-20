@@ -10,17 +10,17 @@
  */
 
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Modal, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useMachine } from '@xstate/react';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { useCodeScanner } from 'react-native-vision-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { scannerMachine } from '../machines/scanner.machine';
-import { StorageLocation, InventoryItem } from '../types/scanner.types';
+import { StorageLocation, InventoryItem, ScannerEvent } from '../types/scanner.types';
 import StorageLocationPicker from './StorageLocationPicker';
 import ExpirationDateCapture from './ExpirationDateCapture';
 import EditableReview from './EditableReview';
-import { Theme, ControlTowerMark } from '../theme/MommaBsHouseholdTheme';
+import { Theme } from '../theme/MommaBsHouseholdTheme';
 
 // ============================================================================
 // Component Props
@@ -91,6 +91,7 @@ export default function BarcodeScannerV2({
       showCamera: state.matches({ scanning: 'barcode' }),
       showPLUEntry: state.matches({ scanning: 'plu' }),
       showPhotoCapture: state.matches({ scanning: 'photo' }),
+      showManualEntry: state.matches({ scanning: 'manual' }),
 
       // Processing states
       showMatchSelection: state.matches({ processing: 'selectingMatch' }),
@@ -102,6 +103,7 @@ export default function BarcodeScannerV2({
         state.matches({ processing: 'lookingUpPLU' }) ||
         state.matches({ processing: 'identifyingWithAI' }) ||
         state.matches({ processing: 'creatingPLUItem' }) ||
+        state.matches({ processing: 'creatingManualItem' }) ||
         state.matches({ processing: 'updatingExpiration' }) ||
         state.matches({ processing: 'finalizing' }),
 
@@ -243,10 +245,10 @@ export default function BarcodeScannerV2({
       {ui.showHomeScreen && (
         <View style={styles.homeScreen}>
           <View style={styles.homeHeader}>
-            <ControlTowerMark
-              size={80}
-              emphasis={{ emphasize: [0, 1, 3, 4, 6, 7] }}
-              frameColor={Theme.color.frameScanner}
+            <Image
+              source={require('../assets/images/app-icon.png')}
+              style={styles.appIcon}
+              resizeMode="contain"
             />
             <Text style={styles.appTitle}>Momma B's Scanner</Text>
           </View>
@@ -283,6 +285,16 @@ export default function BarcodeScannerV2({
             >
               <View style={styles.buttonInner}>
                 <Text style={styles.secondaryButtonText}>📸 Scan by Photo</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.startScanButton, styles.secondaryButton]}
+              onPress={() => send({ type: 'START_MANUAL_ENTRY' })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.buttonInner}>
+                <Text style={styles.secondaryButtonText}>✏️ Manual Entry</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -343,6 +355,9 @@ export default function BarcodeScannerV2({
 
       {/* PHOTO CAPTURE SCREEN - scanning.photo state */}
       {ui.showPhotoCapture && <PhotoCaptureScreen onSubmit={handlers.onPhotoCaptured} onCancel={handlers.onCancel} />}
+
+      {/* MANUAL ENTRY SCREEN - scanning.manual state */}
+      {ui.showManualEntry && <ManualEntryScreen send={send} onCancel={handlers.onCancel} />}
 
       {/* MATCH SELECTION SCREEN - processing.selectingMatch state */}
       {ui.showMatchSelection && state.context.matches && (
@@ -497,6 +512,99 @@ export default function BarcodeScannerV2({
         </View>
       )}
     </View>
+  );
+}
+
+// ============================================================================
+// PLU Entry Screen Component
+// ============================================================================
+
+// ============================================================================
+// Manual Entry Screen Component
+// ============================================================================
+
+interface ManualEntryScreenProps {
+  send: (event: ScannerEvent) => void;
+  onCancel: () => void;
+}
+
+function ManualEntryScreen({ send, onCancel }: ManualEntryScreenProps) {
+  const [productName, setProductName] = useState('');
+  const [brandName, setBrandName] = useState('');
+
+  const handleSubmit = () => {
+    if (productName.trim().length > 0) {
+      send({ type: 'MANUAL_ENTRY_SUBMITTED' });
+    }
+  };
+
+  // Update context as user types
+  React.useEffect(() => {
+    if (productName.trim().length > 0) {
+      send({ type: 'SET_MANUAL_PRODUCT_NAME', product_name: productName });
+    }
+  }, [productName, send]);
+
+  React.useEffect(() => {
+    if (brandName.trim().length > 0) {
+      send({ type: 'SET_MANUAL_BRAND', brand_name: brandName });
+    }
+  }, [brandName, send]);
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.homeScreen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
+      <View style={styles.homeContent}>
+        <Text style={styles.welcomeText}>Manual Entry</Text>
+        <Text style={styles.instructionText}>
+          Enter product information manually
+        </Text>
+
+        <TextInput
+          style={styles.pluInput}
+          value={productName}
+          onChangeText={setProductName}
+          placeholder="Product name (required)"
+          placeholderTextColor="#666"
+          autoFocus
+        />
+
+        <TextInput
+          style={[styles.pluInput, { marginTop: 12 }]}
+          value={brandName}
+          onChangeText={setBrandName}
+          placeholder="Brand name (optional)"
+          placeholderTextColor="#666"
+        />
+
+        <TouchableOpacity
+          style={[
+            styles.startScanButton,
+            productName.trim().length === 0 && styles.disabledButton,
+          ]}
+          onPress={handleSubmit}
+          disabled={productName.trim().length === 0}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonInner}>
+            <Text style={styles.startScanButtonText}>✓ Continue</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.startScanButton, styles.discardButton]}
+          onPress={onCancel}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonInner}>
+            <Text style={styles.startScanButtonText}>✕ Cancel</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -803,6 +911,10 @@ const styles = StyleSheet.create({
     padding: Theme.space.lg,
     paddingTop: 60,
   },
+  appIcon: {
+    width: 80,
+    height: 80,
+  },
   appTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -831,7 +943,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   startScanButton: {
-    backgroundColor: Theme.color.frameScanner,
+    backgroundColor: '#10E010',
     paddingVertical: 20,
     paddingHorizontal: 40,
     borderRadius: Theme.radius.input,
@@ -993,15 +1105,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButton: {
-    backgroundColor: Theme.color.panelMuted,
+    backgroundColor: '#10E010',
     borderWidth: 1,
-    borderColor: Theme.color.border,
+    borderColor: '#10E010',
     marginTop: 15,
   },
   secondaryButtonText: {
-    color: Theme.color.ink,
-    fontSize: 18,
-    fontWeight: '600',
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
     textAlign: 'center',
   },
   // PLU Entry screen styles
