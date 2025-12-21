@@ -88,7 +88,45 @@
 
 **P3+ - Deferred:**
 - Full TypeScript migration
-- Comprehensive UAT (300+ test cases in SCANNER_UAT.md)
+
+---
+
+## Testing & Quality
+
+**UAT Checklist:** `SCANNER_UAT.md` - 600+ test cases
+**Pre-Ship Audit:** `PRE_SHIP_AUDIT.md` - 300+ audit points
+
+### SCANNER_UAT.md Coverage (Updated Dec 21, 2025)
+
+**Comprehensive rewrite completed** - All gaps from initial testing filled
+
+- **11 major sections**, 600+ individual test cases
+- **Section 0 (NEW):** App Launch & Settings (20 tests)
+  - Settings/Profile screen tests
+  - App info screen tests
+- **Section 2.4 (EXPANDED):** Product Review & Edit (54 tests, was 17)
+  - All fields: Product name, brand, package size/unit/description
+  - Quantity toggle (each vs weight) + scroll picker
+  - "Flag for Review" and "Approve with Edits" buttons
+- **Section 2.5 (EXPANDED):** Expiration Date (30 tests, was 16)
+  - Past date validation (UAT-011 BLOCKER)
+  - "No Expiration" option
+- **Section 2.6 (NEW):** Final Confirmation & Save (22 tests)
+  - Success screen, "Scan Another" flow
+- **Section 2.8 (NEW):** Error Recovery (12 tests)
+  - "Product Not Found" flow, manual entry fallback
+- **Complete coverage:** Barcode, PLU, Photo, Manual workflows
+- **Database integrity:** All workflows verified
+- **Known issues tracked:** UAT-002, UAT-003, UAT-004, UAT-011 (blocker)
+
+### Known Issues from Initial Testing
+
+| ID | Description | Priority | Status |
+|----|-------------|----------|--------|
+| UAT-002 | Settings screen doesn't exist | P1 | Documented in UAT |
+| UAT-003 | No profile/account access | P1 | Documented in UAT |
+| UAT-004 | App info not accessible | P1 | Documented in UAT |
+| UAT-011 | **BLOCKER** - Past expiration dates not allowed | BLOCKER | Documented in UAT |
 
 ---
 
