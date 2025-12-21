@@ -7,6 +7,20 @@
 
 ---
 
+## Recent Updates
+
+**December 21, 2025 - Evening Session:**
+- ✅ Fixed dev server connection issue (full rebuild required)
+- ✅ Verified app icon configuration (1024x1024 PNG, properly configured)
+- ✅ Dev server running on port 8082 via DevDash
+- ✅ App successfully connects to `exp://192.168.0.211:8082`
+- ✅ Authentication working
+- ✅ Camera permissions prompting correctly
+- **Status:** Ready for comprehensive UAT testing
+- **Next:** Full systematic UAT run starting from Section 0 (SCANNER_UAT.md)
+
+---
+
 ## Roles
 
 **At conversation start, ask: "Am I Desktop Claude or Code Claude?"**
@@ -36,12 +50,23 @@
 **Dev servers are managed via DevDash** - `/Users/macmini/Desktop/DevDash/`
 
 **Port:** 8082
+**Connection URL:** `exp://192.168.0.211:8082` (Mac Mini LAN IP)
+
+**DevDash Configuration:**
+- Command: `npx expo start --port 8082`
+- Working Directory: `/Users/macmini/Desktop/momma-bs-scanner`
+- Server binds to all interfaces (`*:8082`)
 
 **Code Claude Rules:**
 - NEVER start dev servers autonomously
 - NEVER use `run_in_background: true` for dev servers
 - Ask Brian: "Please start the Scanner dev server via DevDash"
 - Wait for confirmation before testing
+
+**Troubleshooting:**
+- If app can't connect, verify Mac Mini IP hasn't changed: `ifconfig en1 | grep "inet "`
+- Server should show "Waiting on http://localhost:8082" in DevDash logs
+- App connects via LAN IP, not localhost
 
 ---
 
