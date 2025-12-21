@@ -554,7 +554,71 @@ serve(async (req) => {
         }
       }
 
-      // Create inventory item with minimal data
+      // API ENRICHMENT: Try to fetch nutrition data from OFF and USDA
+      let openfoodfactsData: any = null
+      let usdaData: any = null
+      let offNutrition: any = {}
+      let usdaNutrition: any = {}
+
+      // Build search query from product_name and brand_name
+      const searchQuery = brand_name
+        ? `${brand_name} ${product_name}`.trim()
+        : product_name
+
+      console.log('Searching APIs for:', searchQuery)
+
+      // PERFORMANCE: Call both APIs in parallel
+      const [offResult, usdaResult] = await Promise.allSettled([
+        // API 1: Open Food Facts text search
+        fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(searchQuery)}&search_simple=1&json=1&page_size=5`, {
+          headers: {
+            'User-Agent': 'MommaBsScanner/1.0 (nutritional tracking app)',
+          },
+        }).then(res => res.ok ? res.json() : null),
+
+        // API 2: USDA FoodData Central search
+        Deno.env.get('USDA_API_KEY') ? fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${Deno.env.get('USDA_API_KEY')}&query=${encodeURIComponent(searchQuery)}&pageSize=5`, {
+          headers: {
+            'Accept': 'application/json',
+          },
+        }).then(res => res.ok ? res.json() : null) : Promise.resolve(null),
+      ])
+
+      // Process Open Food Facts result
+      if (offResult.status === 'fulfilled' && offResult.value?.products?.[0]) {
+        openfoodfactsData = { product: offResult.value.products[0] }
+        const offProduct = offResult.value.products[0]
+
+        console.log('✓ Open Food Facts found product:', offProduct.product_name)
+
+        // Extract nutrition data from OFF (metadata not used for manual entries)
+        offNutrition = extractOFFNutrition(offProduct)
+      } else if (offResult.status === 'rejected') {
+        console.error('Open Food Facts API error:', offResult.reason)
+      } else {
+        console.log('✗ No results from Open Food Facts search')
+      }
+
+      // Process USDA FoodData Central result
+      if (usdaResult.status === 'fulfilled' && usdaResult.value?.foods?.[0]) {
+        usdaData = usdaResult.value
+        const usdaFood = usdaResult.value.foods[0]
+
+        console.log('✓ USDA FoodData Central found food:', usdaFood.description)
+
+        // Extract USDA nutrition data (metadata not used for manual entries)
+        usdaNutrition = extractUSDANutrition(usdaFood)
+      } else if (usdaResult.status === 'rejected') {
+        console.error('USDA FoodData Central API error:', usdaResult.reason)
+      } else {
+        console.log('✗ No results from USDA FoodData Central search (or no API key configured)')
+      }
+
+      // Prepare final product data (user input takes priority, enrichment is supplemental)
+      const finalFoodName = product_name // Always use user's product name
+      const finalBrandName = brand_name || null
+
+      // Create inventory item with minimal data + API enrichment
       // Generate a unique barcode for manual entries (format: MANUAL-timestamp)
       const manualBarcode = barcode || `MANUAL-${Date.now()}`
 
@@ -564,8 +628,86 @@ serve(async (req) => {
           barcode: manualBarcode,
           storage_location_id: storage_location_id,
           household_id: householdId, // SECURITY: Use authenticated user's household
-          food_name: product_name,
-          brand_name: brand_name || null,
+
+          // Basic product info (user input takes priority)
+          food_name: finalFoodName,
+          brand_name: finalBrandName,
+
+          // Serving information - NULL for manual entries
+          serving_qty: null,
+          serving_unit: null,
+          serving_weight_grams: null,
+
+          // USDA-specific nutrition data (provenance)
+          usda_calories: usdaNutrition.usda_calories,
+          usda_protein: usdaNutrition.usda_protein,
+          usda_total_fat: usdaNutrition.usda_total_fat,
+          usda_saturated_fat: usdaNutrition.usda_saturated_fat,
+          usda_trans_fat: usdaNutrition.usda_trans_fat,
+          usda_cholesterol: usdaNutrition.usda_cholesterol,
+          usda_sodium: usdaNutrition.usda_sodium,
+          usda_total_carbohydrate: usdaNutrition.usda_total_carbohydrate,
+          usda_dietary_fiber: usdaNutrition.usda_dietary_fiber,
+          usda_sugars: usdaNutrition.usda_sugars,
+          usda_added_sugars: usdaNutrition.usda_added_sugars,
+          usda_potassium: usdaNutrition.usda_potassium,
+          usda_vitamin_d: usdaNutrition.usda_vitamin_d,
+          usda_calcium: usdaNutrition.usda_calcium,
+          usda_iron: usdaNutrition.usda_iron,
+          usda_fdc_id: usdaNutrition.usda_fdc_id,
+          usda_raw_data: usdaData,
+
+          // OFF-specific nutrition data (provenance)
+          off_calories: offNutrition.off_calories,
+          off_protein: offNutrition.off_protein,
+          off_total_fat: offNutrition.off_total_fat,
+          off_saturated_fat: offNutrition.off_saturated_fat,
+          off_trans_fat: offNutrition.off_trans_fat,
+          off_sodium: offNutrition.off_sodium,
+          off_total_carbohydrate: offNutrition.off_total_carbohydrate,
+          off_dietary_fiber: offNutrition.off_dietary_fiber,
+          off_sugars: offNutrition.off_sugars,
+          off_potassium: offNutrition.off_potassium,
+
+          // Photos - NULL for manual entries
+          photo_thumb: null,
+          photo_highres: null,
+
+          // Package information - NULL for manual entries
+          package_size: null,
+          package_unit: null,
+
+          // Health scores - NULL for manual entries
+          nutriscore_grade: null,
+          nova_group: null,
+          ecoscore_grade: null,
+          nutrient_levels: null,
+
+          // Dietary information - NULL for manual entries
+          is_vegan: null,
+          is_vegetarian: null,
+          is_palm_oil_free: null,
+          allergens: null,
+          traces: null,
+
+          // Labels & certifications - NULL for manual entries
+          labels: null,
+          labels_tags: null,
+
+          // Environmental data - NULL for manual entries
+          packaging_type: null,
+          packaging_tags: null,
+          manufacturing_places: null,
+          origins: null,
+          countries: null,
+
+          // Data sources tracking
+          data_sources: {
+            usda: usdaData ? true : false,
+            upcitemdb: false,
+            openfoodfacts: openfoodfactsData ? true : false,
+          },
+
           expiration_date: expiration_date,
           notes: notes || null,
           status: 'pending', // Will be set to active after expiration capture
@@ -590,12 +732,16 @@ serve(async (req) => {
         )
       }
 
-      console.log('Manual entry complete, item_id:', inventoryItem.id)
+      console.log('Manual entry complete with API enrichment, item_id:', inventoryItem.id)
 
       const responseData = {
         success: true,
         scan_id: inventoryItem.id,
         item: inventoryItem,
+        enrichment: {
+          off_found: openfoodfactsData ? true : false,
+          usda_found: usdaData ? true : false,
+        }
       }
 
       // IDEMPOTENCY: Cache response if idempotency_key provided
@@ -684,6 +830,40 @@ function extractUPCProduct(item: any) {
     serving_weight_grams: null,
     photo_thumb: item.images?.[0] || null,
     photo_highres: item.images?.[0] || null,
+  }
+}
+
+// Extract nutrition data from USDA FoodData Central response
+function extractUSDANutrition(food: any) {
+  // USDA FoodData Central provides nutrients in foodNutrients array
+  const nutrients = food.foodNutrients || []
+
+  // Helper to find nutrient by name or number
+  const findNutrient = (names: string[], nutrientNumbers: number[]) => {
+    const nutrient = nutrients.find((n: any) =>
+      names.some(name => n.nutrientName?.toLowerCase().includes(name.toLowerCase())) ||
+      nutrientNumbers.includes(n.nutrientNumber)
+    )
+    return nutrient?.value ?? null
+  }
+
+  return {
+    usda_calories: findNutrient(['energy'], [208]),
+    usda_protein: findNutrient(['protein'], [203]),
+    usda_total_fat: findNutrient(['total lipid', 'fat'], [204]),
+    usda_saturated_fat: findNutrient(['fatty acids, total saturated'], [606]),
+    usda_trans_fat: findNutrient(['fatty acids, total trans'], [605]),
+    usda_cholesterol: findNutrient(['cholesterol'], [601]),
+    usda_sodium: findNutrient(['sodium'], [307]),
+    usda_total_carbohydrate: findNutrient(['carbohydrate'], [205]),
+    usda_dietary_fiber: findNutrient(['fiber', 'total dietary'], [291]),
+    usda_sugars: findNutrient(['sugars, total'], [269]),
+    usda_added_sugars: findNutrient(['sugars, added'], [539]),
+    usda_potassium: findNutrient(['potassium'], [306]),
+    usda_vitamin_d: findNutrient(['vitamin d'], [328]),
+    usda_calcium: findNutrient(['calcium'], [301]),
+    usda_iron: findNutrient(['iron'], [303]),
+    usda_fdc_id: food.fdcId || null,
   }
 }
 
