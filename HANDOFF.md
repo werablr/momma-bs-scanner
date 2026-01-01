@@ -1,9 +1,11 @@
-# Momma B's Household - Handoff
+# Scanner Module - Handoff
 
-**App:** React Native (iPhone)
+**Parent App:** Momma B's Household (see [Master HANDOFF](../mommabshousehold-site/HANDOFF.md))
+**Module:** Scanner
 **Location:** `/Users/macmini/Desktop/momma-bs-scanner/`
-**Purpose:** Unified household app. Current module: Scanner (barcode + PLU + AI Vision)
-**Last Updated:** December 21, 2025
+**Purpose:** Ingest food into database (barcode, PLU, AI Vision, manual entry)
+**Stack:** React Native + Expo + XState v5 + Supabase
+**Last Updated:** December 31, 2025
 
 ---
 
@@ -71,8 +73,6 @@
 ---
 
 ## Architecture
-
-**Stack:** React Native + Expo + XState v5 + Supabase
 
 **Key Files:**
 - `machines/scanner.machine.ts` - State machine (687 lines, 19 tests)
