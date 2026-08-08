@@ -21,20 +21,11 @@ function getCorsHeaders(origin: string | null) {
   }
 }
 
-// Helper function to log to database
-async function dbLog(supabaseClient: any, level: string, message: string, data: any = null, barcode: string | null = null) {
-  try {
-    console.log(`[${level.toUpperCase()}] ${message}`, data ? JSON.stringify(data).substring(0, 200) : '')
-    await supabaseClient.from('edge_function_logs').insert({
-      function_name: 'scanner-ingest',
-      log_level: level,
-      message: message,
-      data: data,
-      barcode: barcode
-    })
-  } catch (e) {
-    console.error('Failed to write to log table:', e)
-  }
+// Structured console logging only. The edge_function_logs table was dropped in
+// the 2026-04-15 rebuild; the old DB insert here failed on every call (added a
+// dead HTTP round-trip per log line). Platform log drains capture console.*.
+async function dbLog(_supabaseClient: any, level: string, message: string, data: any = null, barcode: string | null = null) {
+  console.log(`[${level.toUpperCase()}] ${message}`, data ? JSON.stringify(data).substring(0, 200) : '', barcode ?? '')
 }
 
 // Helper function to get user's household_id from JWT
@@ -317,7 +308,6 @@ serve(async (req) => {
               },
               p_product_name: product.food_name,
               p_brand_name: product.brand_name,
-              p_nutritionix_data: null,
               p_upcitemdb_data: upcitemdbData,
               p_openfoodfacts_data: openfoodfactsData,
               p_usda_data: null, // USDA enrichment now handled by Pantry app
@@ -483,7 +473,10 @@ serve(async (req) => {
       if (step === 2) {
         console.log('Step 2: Processing expiration for item_id:', scan_id)
 
-        // Update inventory item with expiration date and mark as active
+        // Update inventory item with expiration date and mark as active.
+        // SECURITY: household_id filter is required — this runs as service_role
+        // (RLS bypassed), so without it any authenticated user could update any
+        // household's item by guessing ids (audit 2026-07, IDOR finding).
         const { data: updatedItem, error: updateError } = await supabaseClient
           .from('inventory_items')
           .update({
@@ -494,6 +487,7 @@ serve(async (req) => {
             status: 'active',
           })
           .eq('id', scan_id)
+          .eq('household_id', householdId)
           .select()
           .single()
 
@@ -710,7 +704,10 @@ serve(async (req) => {
 
           expiration_date: expiration_date,
           notes: notes || null,
-          status: 'pending', // Will be set to active after expiration capture
+          // 'pending' until the client's review step approves (updateStatus in
+          // scanner.machine.ts flips to 'active'); abandoned pendings are
+          // reaped by the nightly cleanup-stuck-pending-items cron by design.
+          status: 'pending',
           volume_remaining: 100, // Default to 100% for manual entries
         })
         .select()
